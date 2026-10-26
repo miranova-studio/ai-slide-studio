@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://frame.local/schema/slide-deck.v1.json",
+  "title": "FRAME Slide Deck v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "title",
+    "template",
+    "canvas",
+    "slides",
+    "updatedAt"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "minLength": 1 },
+    "title": { "type": "string" },
+    "template": { "enum": ["paper", "ink", "signal"] },
+    "canvas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height", "unit"],
+      "properties": {
+        "width": { "const": 13.333 },
+        "height": { "const": 7.5 },
+        "unit": { "const": "in" }
+      }
+    },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "slides": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/slide" }
+    }
+  },
+  "$defs": {
+    "slide": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "elements"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "elements": { "type": "array", "items": { "$ref": "#/$defs/element" } }
+      }
+    },
+    "element": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["id", "type", "x", "y", "width", "height", "style"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "type": { "enum": ["text", "image", "shape"] },
+        "x": { "type": "number", "minimum": 0, "maximum": 13.333 },
+        "y": { "type": "number", "minimum": 0, "maximum": 7.5 },
+        "width": { "type": "number", "exclusiveMinimum": 0, "maximum": 13.333 },
+        "height": { "type": "number", "exclusiveMinimum": 0, "maximum": 7.5 },
+        "style": { "type": "object" }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "type": { "const": "text" },
+            "text": { "type": "string" },
+            "style": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["fontSize"],
+              "properties": {
+                "fontFamily": { "type": "string" },
+                "fontSize": { "type": "number", "exclusiveMinimum": 0 },
+                "color": { "type": "string" },
+                "bold": { "type": "boolean" },
+                "align": { "enum": ["left", "center", "right"] },
+                "verticalAlign": { "enum": ["top", "middle", "bottom"] },
+                "lineHeight": { "type": "number", "exclusiveMinimum": 0 }
+              }
+            }
+          },
+          "required": ["text"]
+        },
+        {
+          "properties": {
+            "type": { "const": "image" },
+            "src": {
+              "type": "string",
+              "pattern": "^data:image/(png|jpeg|webp);base64,"
+            },
+            "alt": { "type": "string" },
+            "style": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "fit": { "enum": ["cover", "contain"] },
+                "opacity": { "type": "number", "minimum": 0, "maximum": 1 },
+                "borderRadius": { "type": "number", "minimum": 0 }
+              }
+            }
+          },
+          "required": ["src"]
+        },
+        {
+          "properties": {
+            "type": { "const": "shape" },
+            "shape": { "enum": ["rect", "ellipse"] },
+            "style": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["fill"],
+              "properties": {
+                "fill": { "type": "string" },
+                "stroke": { "type": "string" },
+                "strokeWidth": { "type": "number", "minimum": 0 },
+                "opacity": { "type": "number", "minimum": 0, "maximum": 1 }
+              }
+            }
+          },
+          "required": ["shape"]
+        }
+      ]
+    }
+  }
+}
