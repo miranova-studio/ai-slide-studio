@@ -29,6 +29,8 @@ export function makeSlide(
 ): Slide {
   return {
     id: crypto.randomUUID(),
+    hidden: false,
+    notes: [],
     elements: [
       makeText(eyebrow, 1.02, 1.65, 10.8, 0.35, 12, true),
       makeText(title, 1.02, 2.28, 10.7, 2.15, 44, true),

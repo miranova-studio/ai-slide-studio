@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 export const SLIDE_WIDTH = 13.333;
 export const SLIDE_HEIGHT = 7.5;
 export type TemplateId = "paper" | "ink" | "signal";
@@ -41,9 +41,19 @@ export interface ShapeElement extends ElementBase {
   };
 }
 export type SlideElement = TextElement | ImageElement | ShapeElement;
+export type NoteKind = "revision" | "question" | "memo";
+export interface SlideNote {
+  id: string;
+  kind: NoteKind;
+  text: string;
+  completed: boolean;
+  createdAt: string;
+}
 export interface Slide {
   id: string;
   elements: SlideElement[];
+  hidden: boolean;
+  notes: SlideNote[];
 }
 export interface Deck {
   schemaVersion: number;

@@ -31,9 +31,25 @@ export function migrateDeck(input: unknown): Deck {
     throw new Error("JSONの形式が正しくありません");
   const version = (input as { schemaVersion?: unknown }).schemaVersion;
   if (version === SCHEMA_VERSION) return assertDeck(input);
+  if (version === 1) return assertDeck(migrateV1(input));
   if (version === undefined || version === 0)
     return assertDeck(migrateLegacy(input as LegacyDeck));
   throw new Error(`未対応のschemaVersion: ${String(version)}`);
+}
+
+function migrateV1(input: unknown): Deck {
+  const old = input as Deck;
+  if (!Array.isArray(old.slides) || old.slides.length === 0)
+    throw new Error("移行できるスライドがありません");
+  return {
+    ...old,
+    schemaVersion: SCHEMA_VERSION,
+    slides: old.slides.map((slide) => ({
+      ...slide,
+      hidden: false,
+      notes: [],
+    })),
+  };
 }
 
 function migrateLegacy(legacy: LegacyDeck): Deck {

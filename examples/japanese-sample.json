@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "japanese-sample",
   "title": "日本語PDF検証",
   "template": "paper",
@@ -8,6 +8,8 @@
   "slides": [
     {
       "id": "sample-slide-1",
+      "hidden": false,
+      "notes": [],
       "elements": [
         {
           "id": "sample-eyebrow",
@@ -43,6 +45,8 @@
     },
     {
       "id": "sample-slide-2",
+      "hidden": false,
+      "notes": [],
       "elements": [
         {
           "id": "sample-shape",

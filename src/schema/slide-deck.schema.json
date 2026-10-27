@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://frame.local/schema/slide-deck.v1.json",
-  "title": "FRAME Slide Deck v1",
+  "$id": "https://frame.local/schema/slide-deck.v2.json",
+  "title": "FRAME Slide Deck v2",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -14,7 +14,7 @@
     "updatedAt"
   ],
   "properties": {
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": { "const": 2 },
     "id": { "type": "string", "minLength": 1 },
     "title": { "type": "string" },
     "template": { "enum": ["paper", "ink", "signal"] },
@@ -39,10 +39,24 @@
     "slide": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "elements"],
+      "required": ["id", "elements", "hidden", "notes"],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
+        "hidden": { "type": "boolean" },
+        "notes": { "type": "array", "items": { "$ref": "#/$defs/note" } },
         "elements": { "type": "array", "items": { "$ref": "#/$defs/element" } }
+      }
+    },
+    "note": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "text", "completed", "createdAt"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["revision", "question", "memo"] },
+        "text": { "type": "string", "minLength": 1 },
+        "completed": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
       }
     },
     "element": {

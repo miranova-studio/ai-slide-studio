@@ -2,11 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
+  Check,
   Download,
   FileInput,
   FileText,
   Image as ImageIcon,
   LayoutGrid,
+  ListOrdered,
   MonitorPlay,
   Plus,
   Save,
@@ -14,6 +16,8 @@ import {
   Sparkles,
   Trash2,
   Type,
+  Eye,
+  EyeOff,
   X,
 } from "lucide-react";
 import { defaultDeck, makeSlide, makeText } from "./data/defaultDeck";
@@ -22,6 +26,7 @@ import { loadDeck, saveDeck } from "./services/storage";
 import { SLIDE_HEIGHT, SLIDE_WIDTH } from "./types";
 import type {
   Deck,
+  NoteKind,
   Slide,
   SlideElement,
   TemplateId,
@@ -38,6 +43,29 @@ const templates: { id: TemplateId; label: string; description: string }[] = [
   { id: "ink", label: "Midnight", description: "暗色で集中を引き出す" },
   { id: "signal", label: "Signal", description: "鮮やかな色と大胆な構成" },
 ];
+
+type ViewMode = "slide" | "grid" | "scroll";
+type RailTab = "outline" | "thumbnails";
+type PanelTab = "edit" | "notes";
+const noteLabels: Record<NoteKind, string> = {
+  revision: "修正",
+  question: "質問",
+  memo: "メモ",
+};
+
+function slideTitle(slide: Slide, index: number): string {
+  const texts = slide.elements.filter(
+    (element): element is TextElement => element.type === "text",
+  );
+  return (
+    texts
+      .find((element) => element.style.fontSize >= 24)
+      ?.text.trim()
+      .replace(/\s+/g, " ") ||
+    texts[0]?.text.trim().replace(/\s+/g, " ") ||
+    `スライド ${index + 1}`
+  );
+}
 
 function elementBox(element: SlideElement): React.CSSProperties {
   return {
@@ -159,6 +187,11 @@ export default function App() {
   const [script, setScript] = useState("");
   const [presenting, setPresenting] = useState(false);
   const [presentIndex, setPresentIndex] = useState(0);
+  const [viewMode, setViewMode] = useState<ViewMode>("slide");
+  const [railTab, setRailTab] = useState<RailTab>("thumbnails");
+  const [panelTab, setPanelTab] = useState<PanelTab>("edit");
+  const [noteKind, setNoteKind] = useState<NoteKind>("revision");
+  const [noteText, setNoteText] = useState("");
   const [toast, setToast] = useState("");
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const imageFileRef = useRef<HTMLInputElement>(null);
@@ -168,6 +201,7 @@ export default function App() {
     deck.slides.findIndex((slide) => slide.id === activeId),
   );
   const activeSlide = deck.slides[activeIndex];
+  const visibleSlides = deck.slides.filter((slide) => !slide.hidden);
   const selected = activeSlide?.elements.find(
     (element) => element.id === selectedId,
   );
@@ -197,12 +231,12 @@ export default function App() {
       if (!presenting) return;
       if (event.key === "Escape") setPresenting(false);
       if (event.key === "ArrowRight")
-        setPresentIndex((i) => Math.min(deck.slides.length - 1, i + 1));
+        setPresentIndex((i) => Math.min(visibleSlides.length - 1, i + 1));
       if (event.key === "ArrowLeft") setPresentIndex((i) => Math.max(0, i - 1));
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [presenting, deck.slides.length]);
+  }, [presenting, visibleSlides.length]);
 
   function notify(message: string) {
     setToast(message);
@@ -265,11 +299,57 @@ export default function App() {
       const slides = [...current.slides];
       const from = slides.findIndex((slide) => slide.id === draggedId);
       const to = slides.findIndex((slide) => slide.id === targetId);
+      if (from < 0 || to < 0) return current;
       const [moved] = slides.splice(from, 1);
       slides.splice(to, 0, moved);
       return { ...current, slides };
     });
     setDraggedId(null);
+  }
+  function selectSlide(id: string) {
+    setActiveId(id);
+    setSelectedId(undefined);
+  }
+  function addNote() {
+    const text = noteText.trim();
+    if (!text) return notify("内容を入力してください");
+    changeSlide((slide) => ({
+      ...slide,
+      notes: [
+        ...slide.notes,
+        {
+          id: crypto.randomUUID(),
+          kind: noteKind,
+          text,
+          completed: false,
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    }));
+    setNoteText("");
+  }
+  function toggleNote(id: string) {
+    changeSlide((slide) => ({
+      ...slide,
+      notes: slide.notes.map((note) =>
+        note.id === id ? { ...note, completed: !note.completed } : note,
+      ),
+    }));
+  }
+  function startPresentation() {
+    if (!visibleSlides.length) return notify("表示できるスライドがありません");
+    setPresentIndex(
+      Math.max(
+        0,
+        visibleSlides.findIndex((slide) => slide.id === activeId),
+      ),
+    );
+    setPresenting(true);
+  }
+  function printDeck() {
+    if (!visibleSlides.length)
+      return notify("PDFに出力できるスライドがありません");
+    window.print();
   }
   async function save() {
     try {
@@ -465,13 +545,7 @@ export default function App() {
               <Save size={16} />
               保存
             </button>
-            <button
-              className="primary"
-              onClick={() => {
-                setPresentIndex(activeIndex);
-                setPresenting(true);
-              }}
-            >
+            <button className="primary" onClick={startPresentation}>
               <MonitorPlay size={16} />
               プレゼン
             </button>
@@ -480,46 +554,86 @@ export default function App() {
         <main>
           <aside className="slide-rail">
             <div className="rail-heading">
-              <span>
-                <LayoutGrid size={15} />
-                スライド
-              </span>
+              <span>スライド一覧</span>
               <button onClick={addSlide} title="スライドを追加">
                 <Plus size={17} />
               </button>
             </div>
-            <div className="thumbnails">
-              {deck.slides.map((slide, index) => (
-                <div
-                  className={`thumb-row ${slide.id === activeId ? "active" : ""}`}
-                  key={slide.id}
-                  draggable
-                  onDragStart={() => setDraggedId(slide.id)}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={() => reorder(slide.id)}
-                >
-                  <span className="thumb-number">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
+            <div
+              className="panel-tabs rail-tabs"
+              role="tablist"
+              aria-label="左パネルの表示"
+            >
+              <button
+                role="tab"
+                aria-selected={railTab === "outline"}
+                className={railTab === "outline" ? "active" : ""}
+                onClick={() => setRailTab("outline")}
+              >
+                <ListOrdered size={14} />
+                目次
+              </button>
+              <button
+                role="tab"
+                aria-selected={railTab === "thumbnails"}
+                className={railTab === "thumbnails" ? "active" : ""}
+                onClick={() => setRailTab("thumbnails")}
+              >
+                <LayoutGrid size={14} />
+                サムネイル
+              </button>
+            </div>
+            {railTab === "outline" ? (
+              <div className="outline-list">
+                {deck.slides.map((slide, index) => (
                   <button
-                    className="thumb"
+                    key={slide.id}
+                    className={`outline-item ${slide.id === activeId ? "active" : ""} ${slide.hidden ? "is-hidden" : ""}`}
                     onClick={() => {
-                      setActiveId(slide.id);
-                      setSelectedId(undefined);
+                      selectSlide(slide.id);
+                      setViewMode("slide");
                     }}
                   >
-                    <SlideCanvas slide={slide} template={deck.template} />
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                    <strong>{slideTitle(slide, index)}</strong>
+                    {slide.hidden && <EyeOff size={13} aria-label="非表示" />}
                   </button>
-                  <button
-                    className="thumb-delete"
-                    onClick={() => deleteSlide(slide.id)}
-                    aria-label={`${index + 1}枚目を削除`}
+                ))}
+              </div>
+            ) : (
+              <div className="thumbnails">
+                {deck.slides.map((slide, index) => (
+                  <div
+                    className={`thumb-row ${slide.id === activeId ? "active" : ""} ${slide.hidden ? "is-hidden" : ""}`}
+                    key={slide.id}
+                    draggable
+                    onDragStart={() => setDraggedId(slide.id)}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={() => reorder(slide.id)}
                   >
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              ))}
-            </div>
+                    <span className="thumb-number">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                    <button
+                      className="thumb"
+                      onClick={() => {
+                        selectSlide(slide.id);
+                        setViewMode("slide");
+                      }}
+                    >
+                      <SlideCanvas slide={slide} template={deck.template} />
+                    </button>
+                    <button
+                      className="thumb-delete"
+                      onClick={() => deleteSlide(slide.id)}
+                      aria-label={`${index + 1}枚目を削除`}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             <button className="add-slide" onClick={addSlide}>
               <Plus size={16} />
               スライドを追加
@@ -527,175 +641,369 @@ export default function App() {
           </aside>
           <section className="workspace">
             <div className="workspace-bar">
-              <span>キャンバス</span>
+              <div
+                className="view-switch"
+                role="tablist"
+                aria-label="スライドの表示形式"
+              >
+                <button
+                  role="tab"
+                  aria-selected={viewMode === "slide"}
+                  className={viewMode === "slide" ? "active" : ""}
+                  onClick={() => setViewMode("slide")}
+                >
+                  スライド
+                </button>
+                <button
+                  role="tab"
+                  aria-selected={viewMode === "grid"}
+                  className={viewMode === "grid" ? "active" : ""}
+                  onClick={() => setViewMode("grid")}
+                >
+                  一覧
+                </button>
+                <button
+                  role="tab"
+                  aria-selected={viewMode === "scroll"}
+                  className={viewMode === "scroll" ? "active" : ""}
+                  onClick={() => setViewMode("scroll")}
+                >
+                  スクロール
+                </button>
+              </div>
               <span>
                 {activeIndex + 1} / {deck.slides.length}
               </span>
             </div>
-            <div className="canvas-wrap">
-              <SlideCanvas
-                slide={activeSlide}
-                template={deck.template}
-                editable
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-                onTextChange={(id, text) =>
-                  updateElement(id, { text } as Partial<TextElement>)
-                }
-              />
-            </div>
-            <p className="edit-hint">
-              テキストを直接編集 · 要素を選ぶと右側で位置を調整できます
-            </p>
+            {viewMode === "slide" ? (
+              <div
+                className={`canvas-wrap ${activeSlide.hidden ? "is-hidden" : ""}`}
+              >
+                <SlideCanvas
+                  slide={activeSlide}
+                  template={deck.template}
+                  editable
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
+                  onTextChange={(id, text) =>
+                    updateElement(id, { text } as Partial<TextElement>)
+                  }
+                />
+              </div>
+            ) : (
+              <div
+                className={`multi-slide-view ${viewMode === "grid" ? "grid-view" : "scroll-view"}`}
+              >
+                {deck.slides.map((slide, index) => (
+                  <div
+                    key={slide.id}
+                    className={`multi-slide-item ${slide.id === activeId ? "active" : ""} ${slide.hidden ? "is-hidden" : ""}`}
+                    draggable={viewMode === "grid"}
+                    onDragStart={() => setDraggedId(slide.id)}
+                    onDragEnd={() => setDraggedId(null)}
+                    onDragOver={(event) => {
+                      if (viewMode === "grid") event.preventDefault();
+                    }}
+                    onDrop={() => {
+                      if (viewMode === "grid") reorder(slide.id);
+                    }}
+                  >
+                    <button
+                      className="multi-slide-heading"
+                      onClick={() => selectSlide(slide.id)}
+                    >
+                      <span>
+                        {String(index + 1).padStart(2, "0")} ·{" "}
+                        {slideTitle(slide, index)}
+                      </span>
+                      {slide.hidden && <span>非表示</span>}
+                    </button>
+                    <button
+                      className="multi-slide-preview"
+                      onClick={() => {
+                        selectSlide(slide.id);
+                        if (viewMode === "grid") setViewMode("slide");
+                      }}
+                    >
+                      <SlideCanvas slide={slide} template={deck.template} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {viewMode === "slide" && (
+              <p className="edit-hint">
+                {activeSlide.hidden
+                  ? "このスライドは発表・PDFから除外されます"
+                  : "テキストを直接編集 · 要素を選ぶと右側で位置を調整できます"}
+              </p>
+            )}
           </section>
           <aside className="properties">
-            <div className="panel-section">
-              <h3>デザイン</h3>
-              <div className="template-list">
-                {templates.map((template) => (
+            <div
+              className="panel-tabs right-tabs"
+              role="tablist"
+              aria-label="右パネルの表示"
+            >
+              <button
+                role="tab"
+                aria-selected={panelTab === "edit"}
+                className={panelTab === "edit" ? "active" : ""}
+                onClick={() => setPanelTab("edit")}
+              >
+                編集
+              </button>
+              <button
+                role="tab"
+                aria-selected={panelTab === "notes"}
+                className={panelTab === "notes" ? "active" : ""}
+                onClick={() => setPanelTab("notes")}
+              >
+                メモ・修正指示
+              </button>
+            </div>
+            {panelTab === "edit" ? (
+              <>
+                <div className="panel-section">
+                  <h3>デザイン</h3>
+                  <div className="template-list">
+                    {templates.map((template) => (
+                      <button
+                        key={template.id}
+                        className={
+                          deck.template === template.id ? "selected" : ""
+                        }
+                        onClick={() =>
+                          changeDeck((current) => ({
+                            ...current,
+                            template: template.id,
+                          }))
+                        }
+                      >
+                        <span
+                          className={`template-swatch swatch-${template.id}`}
+                        />
+                        <span>
+                          <strong>{template.label}</strong>
+                          <small>{template.description}</small>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="panel-section">
+                  <h3>要素を追加</h3>
+                  <div className="element-actions">
+                    <button
+                      onClick={() =>
+                        addElement(
+                          makeText("新しいテキスト", 1.1, 3.1, 6.5, 0.7, 24),
+                        )
+                      }
+                    >
+                      <Type size={16} />
+                      テキスト
+                    </button>
+                    <button
+                      onClick={() =>
+                        addElement({
+                          id: crypto.randomUUID(),
+                          type: "shape",
+                          shape: "rect",
+                          x: 9.5,
+                          y: 5.2,
+                          width: 1.5,
+                          height: 0.7,
+                          style: { fill: "#e15c30" },
+                        })
+                      }
+                    >
+                      <Shapes size={16} />
+                      図形
+                    </button>
+                  </div>
+                  <input
+                    ref={imageFileRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    hidden
+                    onChange={(event) => uploadImage(event.target.files?.[0])}
+                  />
                   <button
-                    key={template.id}
-                    className={deck.template === template.id ? "selected" : ""}
+                    className="upload-zone"
+                    onClick={() => imageFileRef.current?.click()}
+                  >
+                    <ImageIcon size={22} />
+                    <strong>
+                      {selected?.type === "image"
+                        ? "選択中の画像を差し替える"
+                        : "画像を追加する"}
+                    </strong>
+                    <span>PNG / JPG / WebP</span>
+                  </button>
+                </div>
+                {selected && (
+                  <div className="panel-section">
+                    <h3>選択中の要素 · {selected.type}</h3>
+                    <div className="geometry-grid">
+                      {(["x", "y", "width", "height"] as const).map((key) => (
+                        <label key={key}>
+                          {key}
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={selected[key]}
+                            onChange={(event) =>
+                              updateGeometry(key, Number(event.target.value))
+                            }
+                          />
+                        </label>
+                      ))}
+                    </div>
+                    {selected.type === "text" && (
+                      <label className="font-size-field">
+                        文字サイズ (pt)
+                        <input
+                          type="number"
+                          min="1"
+                          max="100"
+                          value={selected.style.fontSize}
+                          onChange={(event) =>
+                            updateElement(selected.id, {
+                              style: {
+                                ...selected.style,
+                                fontSize: Math.max(
+                                  1,
+                                  Number(event.target.value) || 1,
+                                ),
+                              },
+                            } as Partial<TextElement>)
+                          }
+                        />
+                      </label>
+                    )}
+                    <button className="remove-image" onClick={deleteSelected}>
+                      <Trash2 size={14} />
+                      この要素を削除
+                    </button>
+                  </div>
+                )}
+                <div className="panel-section">
+                  <h3>作成と出力</h3>
+                  <button
+                    className="action-row"
+                    onClick={() => setScriptOpen(true)}
+                  >
+                    <Sparkles size={17} />
+                    <span>
+                      <strong>文章から下書き</strong>
+                      <small>段落ごとにスライドへ分割</small>
+                    </span>
+                  </button>
+                  <button className="action-row" onClick={printDeck}>
+                    <Download size={17} />
+                    <span>
+                      <strong>PDF / 印刷</strong>
+                      <small>ブラウザの印刷画面でPDF保存</small>
+                    </span>
+                  </button>
+                  <button className="action-row" onClick={exportJson}>
+                    <FileText size={17} />
+                    <span>
+                      <strong>JSONエクスポート</strong>
+                      <small>外部チームと共通の形式</small>
+                    </span>
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="notes-panel">
+                <div className="panel-section">
+                  <h3>スライドの表示</h3>
+                  <button
+                    className={`visibility-toggle ${activeSlide.hidden ? "hidden" : ""}`}
                     onClick={() =>
-                      changeDeck((current) => ({
-                        ...current,
-                        template: template.id,
+                      changeSlide((slide) => ({
+                        ...slide,
+                        hidden: !slide.hidden,
                       }))
                     }
                   >
-                    <span className={`template-swatch swatch-${template.id}`} />
-                    <span>
-                      <strong>{template.label}</strong>
-                      <small>{template.description}</small>
-                    </span>
+                    {activeSlide.hidden ? (
+                      <EyeOff size={17} />
+                    ) : (
+                      <Eye size={17} />
+                    )}
+                    {activeSlide.hidden
+                      ? "非表示を解除する"
+                      : "発表・PDFで非表示にする"}
                   </button>
-                ))}
-              </div>
-            </div>
-            <div className="panel-section">
-              <h3>要素を追加</h3>
-              <div className="element-actions">
-                <button
-                  onClick={() =>
-                    addElement(
-                      makeText("新しいテキスト", 1.1, 3.1, 6.5, 0.7, 24),
-                    )
-                  }
-                >
-                  <Type size={16} />
-                  テキスト
-                </button>
-                <button
-                  onClick={() =>
-                    addElement({
-                      id: crypto.randomUUID(),
-                      type: "shape",
-                      shape: "rect",
-                      x: 9.5,
-                      y: 5.2,
-                      width: 1.5,
-                      height: 0.7,
-                      style: { fill: "#e15c30" },
-                    })
-                  }
-                >
-                  <Shapes size={16} />
-                  図形
-                </button>
-              </div>
-              <input
-                ref={imageFileRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                hidden
-                onChange={(event) => uploadImage(event.target.files?.[0])}
-              />
-              <button
-                className="upload-zone"
-                onClick={() => imageFileRef.current?.click()}
-              >
-                <ImageIcon size={22} />
-                <strong>
-                  {selected?.type === "image"
-                    ? "選択中の画像を差し替える"
-                    : "画像を追加する"}
-                </strong>
-                <span>PNG / JPG / WebP</span>
-              </button>
-            </div>
-            {selected && (
-              <div className="panel-section">
-                <h3>選択中の要素 · {selected.type}</h3>
-                <div className="geometry-grid">
-                  {(["x", "y", "width", "height"] as const).map((key) => (
-                    <label key={key}>
-                      {key}
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={selected[key]}
-                        onChange={(event) =>
-                          updateGeometry(key, Number(event.target.value))
-                        }
-                      />
-                    </label>
-                  ))}
+                  <p className="panel-help">
+                    非表示でも編集・JSON保存はできます。
+                  </p>
                 </div>
-                {selected.type === "text" && (
-                  <label className="font-size-field">
-                    文字サイズ (pt)
-                    <input
-                      type="number"
-                      min="1"
-                      max="100"
-                      value={selected.style.fontSize}
-                      onChange={(event) =>
-                        updateElement(selected.id, {
-                          style: {
-                            ...selected.style,
-                            fontSize: Math.max(
-                              1,
-                              Number(event.target.value) || 1,
-                            ),
-                          },
-                        } as Partial<TextElement>)
-                      }
-                    />
-                  </label>
-                )}
-                <button className="remove-image" onClick={deleteSelected}>
-                  <Trash2 size={14} />
-                  この要素を削除
-                </button>
+                <div className="panel-section">
+                  <h3>メモ・修正指示を追加</h3>
+                  <div
+                    className="note-kinds"
+                    role="group"
+                    aria-label="メモの種類"
+                  >
+                    {(["revision", "question", "memo"] as const).map((kind) => (
+                      <button
+                        key={kind}
+                        className={noteKind === kind ? "active" : ""}
+                        onClick={() => setNoteKind(kind)}
+                      >
+                        {noteLabels[kind]}
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    className="note-input"
+                    value={noteText}
+                    onChange={(event) => setNoteText(event.target.value)}
+                    placeholder="このスライドへの内容を入力"
+                  />
+                  <button className="primary note-add" onClick={addNote}>
+                    <Plus size={15} />
+                    追加する
+                  </button>
+                </div>
+                <div className="panel-section">
+                  <h3>このスライドの項目 · {activeSlide.notes.length}件</h3>
+                  {activeSlide.notes.length === 0 ? (
+                    <p className="panel-help">まだ項目はありません。</p>
+                  ) : (
+                    <div className="note-list">
+                      {activeSlide.notes.map((note) => (
+                        <div
+                          key={note.id}
+                          className={`note-card ${note.completed ? "completed" : ""}`}
+                        >
+                          <div>
+                            <span className={`note-kind kind-${note.kind}`}>
+                              {noteLabels[note.kind]}
+                            </span>
+                            <button
+                              className="note-check"
+                              onClick={() => toggleNote(note.id)}
+                              aria-label={
+                                note.completed ? "未完了に戻す" : "完了にする"
+                              }
+                              aria-pressed={note.completed}
+                            >
+                              {note.completed && <Check size={13} />}
+                            </button>
+                          </div>
+                          <p>{note.text}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
-            <div className="panel-section">
-              <h3>作成と出力</h3>
-              <button
-                className="action-row"
-                onClick={() => setScriptOpen(true)}
-              >
-                <Sparkles size={17} />
-                <span>
-                  <strong>文章から下書き</strong>
-                  <small>段落ごとにスライドへ分割</small>
-                </span>
-              </button>
-              <button className="action-row" onClick={() => window.print()}>
-                <Download size={17} />
-                <span>
-                  <strong>PDF / 印刷</strong>
-                  <small>ブラウザの印刷画面でPDF保存</small>
-                </span>
-              </button>
-              <button className="action-row" onClick={exportJson}>
-                <FileText size={17} />
-                <span>
-                  <strong>JSONエクスポート</strong>
-                  <small>外部チームと共通の形式</small>
-                </span>
-              </button>
-            </div>
           </aside>
         </main>
         {scriptOpen && (
@@ -741,7 +1049,7 @@ export default function App() {
             className="presentation"
             onClick={() =>
               setPresentIndex((index) =>
-                Math.min(deck.slides.length - 1, index + 1),
+                Math.min(visibleSlides.length - 1, index + 1),
               )
             }
           >
@@ -756,7 +1064,7 @@ export default function App() {
             </button>
             <div className="presentation-slide">
               <SlideCanvas
-                slide={deck.slides[presentIndex]}
+                slide={visibleSlides[presentIndex]}
                 template={deck.template}
               />
             </div>
@@ -773,15 +1081,15 @@ export default function App() {
                 <ChevronLeft />
               </button>
               <span>
-                {presentIndex + 1} / {deck.slides.length}
+                {presentIndex + 1} / {visibleSlides.length}
               </span>
               <button
                 onClick={() =>
                   setPresentIndex((index) =>
-                    Math.min(deck.slides.length - 1, index + 1),
+                    Math.min(visibleSlides.length - 1, index + 1),
                   )
                 }
-                disabled={presentIndex === deck.slides.length - 1}
+                disabled={presentIndex === visibleSlides.length - 1}
               >
                 <ChevronRight />
               </button>
@@ -791,7 +1099,7 @@ export default function App() {
         {toast && <div className="toast">{toast}</div>}
       </div>
       <div className="print-root" aria-hidden="true">
-        {deck.slides.map((slide) => (
+        {visibleSlides.map((slide) => (
           <div className="print-page" key={slide.id}>
             <SlideCanvas slide={slide} template={deck.template} />
           </div>
