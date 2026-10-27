@@ -27,7 +27,9 @@ Each note has `id`, `kind` (`revision`, `question`, or `memo`), non-empty `text`
 | ------- | -------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `text`  | `text` (plain string)                  | `fontSize` (pt); optional `fontFamily`, `color`, `bold`, `align`, `verticalAlign`, `lineHeight` |
 | `image` | `src` (image data URL); optional `alt` | optional `fit`, `opacity`, `borderRadius`                                                       |
-| `shape` | `shape` (`rect` or `ellipse`)          | `fill`; optional `stroke`, `strokeWidth`, `opacity`                                             |
+| `shape` | `shape` (`rect`, `roundRect`, `ellipse`, `triangle`, `line`, `arrow`) | `fill`; optional `stroke`, `strokeWidth`, `opacity` |
+
+`line` uses its stroke color for the visible line; `arrow` uses stroke for its outline and fill for its body. A future PPTX exporter can map `roundRect` to the rounded-rectangle shape and `arrow` to `rightArrow`; confirm the exact `pptxgenjs` shape constants at implementation time. The six shape values are an additive extension of schema v2, so older v2 JSON remains valid.
 
 ## Minimal example
 

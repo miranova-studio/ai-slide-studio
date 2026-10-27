@@ -18,6 +18,8 @@ import {
   Type,
   Eye,
   EyeOff,
+  Redo2,
+  Undo2,
   X,
 } from "lucide-react";
 import { defaultDeck, makeSlide, makeText } from "./data/defaultDeck";
@@ -29,6 +31,7 @@ import type {
   NoteKind,
   Slide,
   SlideElement,
+  ShapeElement,
   TemplateId,
   TextElement,
 } from "./types";
@@ -47,6 +50,31 @@ const templates: { id: TemplateId; label: string; description: string }[] = [
 type ViewMode = "slide" | "grid" | "scroll";
 type RailTab = "outline" | "thumbnails";
 type PanelTab = "edit" | "notes";
+type ResizeCorner = "nw" | "ne" | "sw" | "se";
+type GestureMode = "move" | ResizeCorner;
+const shapeLabels: { value: ShapeElement["shape"]; label: string }[] = [
+  { value: "rect", label: "四角" },
+  { value: "roundRect", label: "角丸四角" },
+  { value: "ellipse", label: "円" },
+  { value: "triangle", label: "三角" },
+  { value: "line", label: "線" },
+  { value: "arrow", label: "矢印" },
+];
+const round2 = (value: number) => Number(value.toFixed(2));
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value));
+
+interface Gesture {
+  elementId: string;
+  slideId: string;
+  mode: GestureMode;
+  startX: number;
+  startY: number;
+  bounds: DOMRect;
+  original: Pick<SlideElement, "x" | "y" | "width" | "height">;
+  before: Deck;
+  changed: boolean;
+}
 const noteLabels: Record<NoteKind, string> = {
   revision: "修正",
   question: "質問",
@@ -81,15 +109,31 @@ function SlideCanvas({
   template,
   editable = false,
   selectedId,
+  editingTextId,
   onSelect,
+  onStartTextEdit,
+  onEndTextEdit,
   onTextChange,
+  onGestureStart,
+  onGestureMove,
+  onGestureEnd,
 }: {
   slide: Slide;
   template: TemplateId;
   editable?: boolean;
   selectedId?: string;
+  editingTextId?: string;
   onSelect?: (id: string) => void;
+  onStartTextEdit?: (id: string) => void;
+  onEndTextEdit?: () => void;
   onTextChange?: (id: string, text: string) => void;
+  onGestureStart?: (
+    event: React.PointerEvent<HTMLElement>,
+    element: SlideElement,
+    mode: GestureMode,
+  ) => void;
+  onGestureMove?: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onGestureEnd?: (event: React.PointerEvent<HTMLDivElement>) => void;
 }) {
   return (
     <div className={`slide-canvas template-${template}`}>
@@ -102,76 +146,142 @@ function SlideCanvas({
         const box = elementBox(element);
         const selected =
           editable && selectedId === element.id ? " element-selected" : "";
-        if (element.type === "text") {
-          const style: React.CSSProperties = {
-            ...box,
-            fontFamily:
-              element.style.fontFamily || "'Noto Sans JP', sans-serif",
-            fontSize: `${(element.style.fontSize / 72 / SLIDE_WIDTH) * 100}cqw`,
-            color: element.style.color || undefined,
-            fontWeight: element.style.bold ? 700 : 400,
-            textAlign: element.style.align || "left",
-            lineHeight: element.style.lineHeight || 1.25,
-            justifyContent:
-              element.style.verticalAlign === "middle"
-                ? "center"
-                : element.style.verticalAlign === "bottom"
-                  ? "flex-end"
-                  : "flex-start",
-          };
-          return (
-            <div
-              key={element.id}
-              className={`slide-element slide-text${selected}`}
-              style={style}
-              contentEditable={editable}
-              suppressContentEditableWarning
-              spellCheck={false}
-              onClick={(event) => {
-                event.stopPropagation();
-                onSelect?.(element.id);
-              }}
-              onBlur={(event) =>
-                onTextChange?.(element.id, event.currentTarget.innerText)
-              }
-            >
-              {element.text}
-            </div>
-          );
-        }
-        if (element.type === "image")
-          return (
-            <div
-              key={element.id}
-              className={`slide-element slide-image${selected}`}
-              style={{ ...box, opacity: element.style.opacity }}
-              onClick={() => onSelect?.(element.id)}
-            >
+        return (
+          <div
+            key={element.id}
+            data-element-id={element.id}
+            data-shape={element.type === "shape" ? element.shape : undefined}
+            className={`slide-element slide-${element.type}${selected}${editingTextId === element.id ? " text-editing" : ""}`}
+            style={{
+              ...box,
+              opacity:
+                element.type === "text" ? undefined : element.style.opacity,
+            }}
+            onClick={(event) => {
+              event.stopPropagation();
+              onSelect?.(element.id);
+            }}
+            onDoubleClick={() => {
+              if (editable && element.type === "text")
+                onStartTextEdit?.(element.id);
+            }}
+            onPointerDown={(event) => {
+              if (!editable || editingTextId === element.id) return;
+              onGestureStart?.(event, element, "move");
+            }}
+            onPointerMove={onGestureMove}
+            onPointerUp={onGestureEnd}
+            onPointerCancel={onGestureEnd}
+          >
+            {element.type === "text" ? (
+              <div
+                className="slide-text-content"
+                data-text-id={element.id}
+                contentEditable={editable && editingTextId === element.id}
+                suppressContentEditableWarning
+                spellCheck={false}
+                style={{
+                  fontFamily:
+                    element.style.fontFamily || "'Noto Sans JP', sans-serif",
+                  fontSize: `${(element.style.fontSize / 72 / SLIDE_WIDTH) * 100}cqw`,
+                  color: element.style.color || undefined,
+                  fontWeight: element.style.bold ? 700 : 400,
+                  textAlign: element.style.align || "left",
+                  lineHeight: element.style.lineHeight || 1.25,
+                  justifyContent:
+                    element.style.verticalAlign === "middle"
+                      ? "center"
+                      : element.style.verticalAlign === "bottom"
+                        ? "flex-end"
+                        : "flex-start",
+                }}
+                onBlur={(event) => {
+                  if (editingTextId === element.id) {
+                    onTextChange?.(element.id, event.currentTarget.innerText);
+                    onEndTextEdit?.();
+                  }
+                }}
+              >
+                {element.text}
+              </div>
+            ) : element.type === "image" ? (
               <img
                 src={element.src}
                 alt={element.alt || ""}
+                draggable={false}
                 style={{
                   objectFit: element.style.fit || "cover",
                   borderRadius: `${element.style.borderRadius || 0}px`,
                 }}
               />
-            </div>
-          );
-        return (
-          <div
-            key={element.id}
-            className={`slide-element slide-shape${selected}`}
-            style={{
-              ...box,
-              background: element.style.fill,
-              opacity: element.style.opacity,
-              border: element.style.stroke
-                ? `${element.style.strokeWidth || 1}px solid ${element.style.stroke}`
-                : undefined,
-              borderRadius: element.shape === "ellipse" ? "50%" : undefined,
-            }}
-            onClick={() => onSelect?.(element.id)}
-          />
+            ) : element.shape === "triangle" ||
+              element.shape === "line" ||
+              element.shape === "arrow" ? (
+              <svg
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                {element.shape === "triangle" ? (
+                  <polygon
+                    points="50,2 98,98 2,98"
+                    fill={element.style.fill}
+                    stroke={element.style.stroke || "none"}
+                    strokeWidth={element.style.strokeWidth || 2}
+                  />
+                ) : element.shape === "arrow" ? (
+                  <polygon
+                    points="2,34 65,34 65,8 98,50 65,92 65,66 2,66"
+                    fill={element.style.fill}
+                    stroke={element.style.stroke || "none"}
+                    strokeWidth={element.style.strokeWidth || 2}
+                  />
+                ) : (
+                  <line
+                    x1="2"
+                    y1="50"
+                    x2="98"
+                    y2="50"
+                    stroke={element.style.stroke || element.style.fill}
+                    strokeWidth={Math.max(
+                      2,
+                      (element.style.strokeWidth || 2) * 2,
+                    )}
+                  />
+                )}
+              </svg>
+            ) : (
+              <div
+                className="shape-fill"
+                style={{
+                  background: element.style.fill,
+                  border: element.style.stroke
+                    ? `${element.style.strokeWidth || 1}px solid ${element.style.stroke}`
+                    : undefined,
+                  borderRadius:
+                    element.shape === "ellipse"
+                      ? "50%"
+                      : element.shape === "roundRect"
+                        ? "15%"
+                        : undefined,
+                }}
+              />
+            )}
+            {selected &&
+              editingTextId !== element.id &&
+              (["nw", "ne", "sw", "se"] as const).map((corner) => (
+                <span
+                  key={corner}
+                  className={`resize-handle handle-${corner}`}
+                  role="button"
+                  aria-label={`${corner} サイズ変更`}
+                  onPointerDown={(event) => {
+                    event.stopPropagation();
+                    onGestureStart?.(event, element, corner);
+                  }}
+                />
+              ))}
+          </div>
         );
       })}
     </div>
@@ -180,9 +290,23 @@ function SlideCanvas({
 
 export default function App() {
   const [deck, setDeck] = useState<Deck>(defaultDeck);
+  const deckRef = useRef<Deck>(defaultDeck);
+  const historyRef = useRef<{ past: Deck[]; future: Deck[] }>({
+    past: [],
+    future: [],
+  });
+  const [, refreshHistory] = useState(0);
+  const gestureRef = useRef<Gesture | null>(null);
   const [ready, setReady] = useState(false);
   const [activeId, setActiveId] = useState(defaultDeck.slides[0].id);
   const [selectedId, setSelectedId] = useState<string | undefined>();
+  const [editingTextId, setEditingTextId] = useState<string | undefined>();
+  const [shapeKind, setShapeKind] = useState<ShapeElement["shape"]>("rect");
+  const [thumbnailMenu, setThumbnailMenu] = useState<{
+    slideId: string;
+    x: number;
+    y: number;
+  } | null>(null);
   const [scriptOpen, setScriptOpen] = useState(false);
   const [script, setScript] = useState("");
   const [presenting, setPresenting] = useState(false);
@@ -213,6 +337,7 @@ export default function App() {
   useEffect(() => {
     loadDeck()
       .then((loaded) => {
+        deckRef.current = loaded;
         setDeck(loaded);
         setActiveId(loaded.slides[0].id);
       })
@@ -227,6 +352,25 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!editingTextId) return;
+    const field = document.querySelector<HTMLElement>(
+      `.canvas-wrap [data-text-id="${CSS.escape(editingTextId)}"]`,
+    );
+    field?.focus();
+  }, [editingTextId]);
+
+  useEffect(() => {
+    if (!thumbnailMenu) return;
+    const close = () => setThumbnailMenu(null);
+    window.addEventListener("click", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [thumbnailMenu]);
+
+  useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (!presenting) return;
       if (event.key === "Escape") setPresenting(false);
@@ -238,15 +382,82 @@ export default function App() {
     return () => window.removeEventListener("keydown", handler);
   }, [presenting, visibleSlides.length]);
 
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const typing = !!target?.closest(
+        'input, textarea, [contenteditable="true"]',
+      );
+      if (typing || presenting || scriptOpen) return;
+      const shortcut = event.metaKey || event.ctrlKey;
+      if (shortcut && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        if (event.shiftKey) redo();
+        else undo();
+      } else if (shortcut && event.key.toLowerCase() === "y") {
+        event.preventDefault();
+        redo();
+      } else if (
+        !shortcut &&
+        (event.key === "Delete" || event.key === "Backspace") &&
+        selectedId
+      ) {
+        event.preventDefault();
+        deleteSelected();
+      } else if (event.key === "Escape") {
+        setThumbnailMenu(null);
+        setSelectedId(undefined);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  });
+
   function notify(message: string) {
     setToast(message);
     window.setTimeout(() => setToast(""), 3500);
   }
+  function showDeck(next: Deck) {
+    deckRef.current = next;
+    setDeck(next);
+  }
+  function pushHistory(before: Deck) {
+    const history = historyRef.current;
+    history.past = [...history.past.slice(-99), before];
+    history.future = [];
+    refreshHistory((value) => value + 1);
+  }
   function changeDeck(update: (current: Deck) => Deck) {
-    setDeck((current) => ({
-      ...update(current),
-      updatedAt: new Date().toISOString(),
-    }));
+    const before = deckRef.current;
+    const next = update(before);
+    if (next === before) return;
+    pushHistory(before);
+    showDeck({ ...next, updatedAt: new Date().toISOString() });
+  }
+  function restoreDeck(next: Deck) {
+    showDeck(next);
+    setActiveId((current) =>
+      next.slides.some((slide) => slide.id === current)
+        ? current
+        : next.slides[0].id,
+    );
+    setSelectedId(undefined);
+    setEditingTextId(undefined);
+    refreshHistory((value) => value + 1);
+  }
+  function undo() {
+    const history = historyRef.current;
+    const previous = history.past.pop();
+    if (!previous) return;
+    history.future.push(deckRef.current);
+    restoreDeck(previous);
+  }
+  function redo() {
+    const history = historyRef.current;
+    const next = history.future.pop();
+    if (!next) return;
+    history.past.push(deckRef.current);
+    restoreDeck(next);
   }
   function changeSlide(update: (slide: Slide) => Slide) {
     changeDeck((current) => ({
@@ -305,6 +516,15 @@ export default function App() {
       return { ...current, slides };
     });
     setDraggedId(null);
+  }
+  function toggleSlideHidden(id: string) {
+    changeDeck((current) => ({
+      ...current,
+      slides: current.slides.map((slide) =>
+        slide.id === id ? { ...slide, hidden: !slide.hidden } : slide,
+      ),
+    }));
+    setThumbnailMenu(null);
   }
   function selectSlide(id: string) {
     setActiveId(id);
@@ -368,9 +588,12 @@ export default function App() {
     try {
       const imported = migrateDeck(JSON.parse(await file.text()));
       await saveDeck(imported);
-      setDeck(imported);
+      showDeck(imported);
+      historyRef.current = { past: [], future: [] };
+      refreshHistory((value) => value + 1);
       setActiveId(imported.slides[0].id);
       setSelectedId(undefined);
+      setEditingTextId(undefined);
       notify(`${imported.slides.length}枚をインポートしました`);
     } catch (error) {
       notify(
@@ -478,6 +701,7 @@ export default function App() {
       elements: slide.elements.filter((element) => element.id !== selected.id),
     }));
     setSelectedId(undefined);
+    setEditingTextId(undefined);
   }
   function updateGeometry(key: "x" | "y" | "width" | "height", value: number) {
     if (!selected || !Number.isFinite(value)) return;
@@ -497,6 +721,118 @@ export default function App() {
     updateElement(selected.id, {
       [key]: Number(safe.toFixed(2)),
     } as Partial<SlideElement>);
+  }
+  function updateShapeColor(id: string, key: "fill" | "stroke", value: string) {
+    const current = deckRef.current.slides
+      .find((slide) => slide.id === activeId)
+      ?.elements.find((element) => element.id === id);
+    if (current?.type !== "shape" || current.style[key] === value) return;
+    updateElement(id, {
+      style: { ...current.style, [key]: value },
+    } as Partial<ShapeElement>);
+  }
+
+  function startGesture(
+    event: React.PointerEvent<HTMLElement>,
+    element: SlideElement,
+    mode: GestureMode,
+  ) {
+    if (event.button !== 0 || editingTextId === element.id) return;
+    const canvas = event.currentTarget.closest(".slide-canvas");
+    if (!canvas) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setSelectedId(element.id);
+    gestureRef.current = {
+      elementId: element.id,
+      slideId: activeId,
+      mode,
+      startX: event.clientX,
+      startY: event.clientY,
+      bounds: canvas.getBoundingClientRect(),
+      original: {
+        x: element.x,
+        y: element.y,
+        width: element.width,
+        height: element.height,
+      },
+      before: deckRef.current,
+      changed: false,
+    };
+  }
+  function moveGesture(event: React.PointerEvent<HTMLDivElement>) {
+    const gesture = gestureRef.current;
+    if (!gesture) return;
+    const dx =
+      ((event.clientX - gesture.startX) / gesture.bounds.width) * SLIDE_WIDTH;
+    const dy =
+      ((event.clientY - gesture.startY) / gesture.bounds.height) * SLIDE_HEIGHT;
+    const old = gesture.original;
+    let x = old.x,
+      y = old.y,
+      width = old.width,
+      height = old.height;
+    if (gesture.mode === "move") {
+      x = clamp(old.x + dx, 0, SLIDE_WIDTH - old.width);
+      y = clamp(old.y + dy, 0, SLIDE_HEIGHT - old.height);
+    } else {
+      if (gesture.mode.includes("w")) {
+        x = clamp(old.x + dx, 0, old.x + old.width - 0.1);
+        width = old.x + old.width - x;
+      } else width = clamp(old.width + dx, 0.1, SLIDE_WIDTH - old.x);
+      if (gesture.mode.includes("n")) {
+        y = clamp(old.y + dy, 0, old.y + old.height - 0.1);
+        height = old.y + old.height - y;
+      } else height = clamp(old.height + dy, 0.1, SLIDE_HEIGHT - old.y);
+    }
+    const geometry = {
+      x: round2(x),
+      y: round2(y),
+      width: round2(width),
+      height: round2(height),
+    };
+    const slide = deckRef.current.slides.find(
+      (item) => item.id === gesture.slideId,
+    );
+    const current = slide?.elements.find(
+      (item) => item.id === gesture.elementId,
+    );
+    if (
+      !current ||
+      (current.x === geometry.x &&
+        current.y === geometry.y &&
+        current.width === geometry.width &&
+        current.height === geometry.height)
+    )
+      return;
+    gesture.changed = true;
+    showDeck({
+      ...deckRef.current,
+      slides: deckRef.current.slides.map((item) =>
+        item.id === gesture.slideId
+          ? {
+              ...item,
+              elements: item.elements.map((entry) =>
+                entry.id === gesture.elementId
+                  ? { ...entry, ...geometry }
+                  : entry,
+              ),
+            }
+          : item,
+      ),
+    });
+  }
+  function endGesture(event: React.PointerEvent<HTMLDivElement>) {
+    const gesture = gestureRef.current;
+    if (!gesture) return;
+    gestureRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    if (gesture.changed) {
+      pushHistory(gesture.before);
+      showDeck({ ...deckRef.current, updatedAt: new Date().toISOString() });
+    }
   }
 
   if (!activeSlide) return null;
@@ -527,6 +863,24 @@ export default function App() {
             </span>
           </div>
           <div className="header-actions">
+            <button
+              className="ghost history-button"
+              onClick={undo}
+              disabled={!historyRef.current.past.length}
+              title="元に戻す (⌘/Ctrl+Z)"
+            >
+              <Undo2 size={16} />
+              元に戻す
+            </button>
+            <button
+              className="ghost history-button"
+              onClick={redo}
+              disabled={!historyRef.current.future.length}
+              title="やり直し (⌘/Ctrl+Shift+Z / Ctrl+Y)"
+            >
+              <Redo2 size={16} />
+              やり直し
+            </button>
             <input
               ref={jsonFileRef}
               type="file"
@@ -607,6 +961,15 @@ export default function App() {
                     className={`thumb-row ${slide.id === activeId ? "active" : ""} ${slide.hidden ? "is-hidden" : ""}`}
                     key={slide.id}
                     draggable
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      selectSlide(slide.id);
+                      setThumbnailMenu({
+                        slideId: slide.id,
+                        x: event.clientX,
+                        y: event.clientY,
+                      });
+                    }}
                     onDragStart={() => setDraggedId(slide.id)}
                     onDragOver={(event) => event.preventDefault()}
                     onDrop={() => reorder(slide.id)}
@@ -630,6 +993,13 @@ export default function App() {
                     >
                       <Trash2 size={13} />
                     </button>
+                    {slide.hidden && (
+                      <EyeOff
+                        className="thumb-hidden-icon"
+                        size={14}
+                        aria-label="非表示"
+                      />
+                    )}
                   </div>
                 ))}
               </div>
@@ -684,10 +1054,23 @@ export default function App() {
                   template={deck.template}
                   editable
                   selectedId={selectedId}
+                  editingTextId={editingTextId}
                   onSelect={setSelectedId}
-                  onTextChange={(id, text) =>
-                    updateElement(id, { text } as Partial<TextElement>)
-                  }
+                  onStartTextEdit={(id) => {
+                    setSelectedId(id);
+                    setEditingTextId(id);
+                  }}
+                  onEndTextEdit={() => setEditingTextId(undefined)}
+                  onTextChange={(id, text) => {
+                    const current = deckRef.current.slides
+                      .find((slide) => slide.id === activeId)
+                      ?.elements.find((element) => element.id === id);
+                    if (current?.type === "text" && current.text !== text)
+                      updateElement(id, { text } as Partial<TextElement>);
+                  }}
+                  onGestureStart={startGesture}
+                  onGestureMove={moveGesture}
+                  onGestureEnd={endGesture}
                 />
               </div>
             ) : (
@@ -735,7 +1118,7 @@ export default function App() {
               <p className="edit-hint">
                 {activeSlide.hidden
                   ? "このスライドは発表・PDFから除外されます"
-                  : "テキストを直接編集 · 要素を選ぶと右側で位置を調整できます"}
+                  : "要素をドラッグで移動・四隅でサイズ変更 · テキストはダブルクリックで編集"}
               </p>
             )}
           </section>
@@ -764,6 +1147,22 @@ export default function App() {
             </div>
             {panelTab === "edit" ? (
               <>
+                <div className="panel-section visibility-section">
+                  <h3>このスライド</h3>
+                  <button
+                    className={`visibility-toggle ${activeSlide.hidden ? "hidden" : ""}`}
+                    onClick={() => toggleSlideHidden(activeSlide.id)}
+                  >
+                    {activeSlide.hidden ? (
+                      <EyeOff size={17} />
+                    ) : (
+                      <Eye size={17} />
+                    )}
+                    {activeSlide.hidden
+                      ? "非表示を解除する"
+                      : "発表・PDFで非表示にする"}
+                  </button>
+                </div>
                 <div className="panel-section">
                   <h3>デザイン</h3>
                   <div className="template-list">
@@ -804,22 +1203,44 @@ export default function App() {
                       <Type size={16} />
                       テキスト
                     </button>
+                  </div>
+                  <div className="shape-add-row">
+                    <select
+                      aria-label="追加する図形の種類"
+                      value={shapeKind}
+                      onChange={(event) =>
+                        setShapeKind(
+                          event.target.value as ShapeElement["shape"],
+                        )
+                      }
+                    >
+                      {shapeLabels.map((shape) => (
+                        <option key={shape.value} value={shape.value}>
+                          {shape.label}
+                        </option>
+                      ))}
+                    </select>
                     <button
                       onClick={() =>
                         addElement({
                           id: crypto.randomUUID(),
                           type: "shape",
-                          shape: "rect",
-                          x: 9.5,
-                          y: 5.2,
-                          width: 1.5,
-                          height: 0.7,
-                          style: { fill: "#e15c30" },
+                          shape: shapeKind,
+                          x: 8.7,
+                          y: 4.8,
+                          width: shapeKind === "line" ? 2.3 : 1.7,
+                          height: shapeKind === "line" ? 0.2 : 1.1,
+                          style: {
+                            fill: "#2454e8",
+                            stroke:
+                              shapeKind === "line" ? "#2454e8" : "#163794",
+                            strokeWidth: 2,
+                          },
                         })
                       }
                     >
                       <Shapes size={16} />
-                      図形
+                      図形を追加
                     </button>
                   </div>
                   <input
@@ -882,6 +1303,61 @@ export default function App() {
                         />
                       </label>
                     )}
+                    {selected.type === "shape" && (
+                      <div className="shape-colors">
+                        <label>
+                          塗り色
+                          <input
+                            type="color"
+                            value={
+                              /^#[0-9a-fA-F]{6}$/.test(selected.style.fill)
+                                ? selected.style.fill
+                                : "#2454e8"
+                            }
+                            onInput={(event) =>
+                              updateShapeColor(
+                                selected.id,
+                                "fill",
+                                event.currentTarget.value,
+                              )
+                            }
+                            onChange={(event) =>
+                              updateShapeColor(
+                                selected.id,
+                                "fill",
+                                event.currentTarget.value,
+                              )
+                            }
+                          />
+                        </label>
+                        <label>
+                          枠線色
+                          <input
+                            type="color"
+                            value={
+                              selected.style.stroke &&
+                              /^#[0-9a-fA-F]{6}$/.test(selected.style.stroke)
+                                ? selected.style.stroke
+                                : "#163794"
+                            }
+                            onInput={(event) =>
+                              updateShapeColor(
+                                selected.id,
+                                "stroke",
+                                event.currentTarget.value,
+                              )
+                            }
+                            onChange={(event) =>
+                              updateShapeColor(
+                                selected.id,
+                                "stroke",
+                                event.currentTarget.value,
+                              )
+                            }
+                          />
+                        </label>
+                      </div>
+                    )}
                     <button className="remove-image" onClick={deleteSelected}>
                       <Trash2 size={14} />
                       この要素を削除
@@ -922,12 +1398,7 @@ export default function App() {
                   <h3>スライドの表示</h3>
                   <button
                     className={`visibility-toggle ${activeSlide.hidden ? "hidden" : ""}`}
-                    onClick={() =>
-                      changeSlide((slide) => ({
-                        ...slide,
-                        hidden: !slide.hidden,
-                      }))
-                    }
+                    onClick={() => toggleSlideHidden(activeSlide.id)}
                   >
                     {activeSlide.hidden ? (
                       <EyeOff size={17} />
@@ -1097,6 +1568,30 @@ export default function App() {
           </div>
         )}
         {toast && <div className="toast">{toast}</div>}
+        {thumbnailMenu && (
+          <div
+            className="thumbnail-menu"
+            role="menu"
+            style={{ left: thumbnailMenu.x, top: thumbnailMenu.y }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              role="menuitem"
+              onClick={() => toggleSlideHidden(thumbnailMenu.slideId)}
+            >
+              {deck.slides.find((slide) => slide.id === thumbnailMenu.slideId)
+                ?.hidden ? (
+                <Eye size={15} />
+              ) : (
+                <EyeOff size={15} />
+              )}
+              {deck.slides.find((slide) => slide.id === thumbnailMenu.slideId)
+                ?.hidden
+                ? "非表示を解除"
+                : "発表・PDFで非表示"}
+            </button>
+          </div>
+        )}
       </div>
       <div className="print-root" aria-hidden="true">
         {visibleSlides.map((slide) => (

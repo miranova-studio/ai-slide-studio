@@ -32,7 +32,7 @@ export interface ImageElement extends ElementBase {
 }
 export interface ShapeElement extends ElementBase {
   type: "shape";
-  shape: "rect" | "ellipse";
+  shape: "rect" | "roundRect" | "ellipse" | "triangle" | "line" | "arrow";
   style: {
     fill: string;
     stroke?: string;

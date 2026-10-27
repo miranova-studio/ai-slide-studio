@@ -117,7 +117,16 @@
         {
           "properties": {
             "type": { "const": "shape" },
-            "shape": { "enum": ["rect", "ellipse"] },
+            "shape": {
+              "enum": [
+                "rect",
+                "roundRect",
+                "ellipse",
+                "triangle",
+                "line",
+                "arrow"
+              ]
+            },
             "style": {
               "type": "object",
               "additionalProperties": false,
