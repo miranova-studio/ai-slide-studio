@@ -1,5 +1,53 @@
 import { SCHEMA_VERSION, SLIDE_HEIGHT, SLIDE_WIDTH } from "../types";
-import type { Deck, Slide, TextElement } from "../types";
+import type {
+  Deck,
+  Slide,
+  TextElement,
+  TemplateId,
+  ShapeElement,
+} from "../types";
+
+export function makeMasterElements(template: TemplateId): ShapeElement[] {
+  const variants = {
+    paper: {
+      shape: "rect",
+      x: 11.2,
+      y: 1.55,
+      width: 2.1,
+      height: 5.95,
+      fill: "#dc6339",
+    },
+    ink: {
+      shape: "ellipse",
+      x: 9.7,
+      y: 0,
+      width: 3.6,
+      height: 3.6,
+      fill: "#24334a",
+    },
+    signal: {
+      shape: "triangle",
+      x: 10.6,
+      y: 0,
+      width: 2.73,
+      height: 7.5,
+      fill: "#f05237",
+    },
+  } as const;
+  const value = variants[template];
+  return [
+    {
+      id: crypto.randomUUID(),
+      type: "shape",
+      shape: value.shape,
+      x: value.x,
+      y: value.y,
+      width: value.width,
+      height: value.height,
+      style: { fill: value.fill, strokeWidth: 0 },
+    },
+  ];
+}
 
 export function makeText(
   text: string,
@@ -30,6 +78,7 @@ export function makeSlide(
   return {
     id: crypto.randomUUID(),
     hidden: false,
+    showMaster: true,
     notes: [],
     elements: [
       makeText(eyebrow, 1.02, 1.65, 10.8, 0.35, 12, true),
@@ -44,6 +93,7 @@ export const defaultDeck: Deck = {
   id: "welcome-deck",
   title: "言葉を、伝わる形へ。",
   template: "paper",
+  masterElements: makeMasterElements("paper"),
   canvas: { width: SLIDE_WIDTH, height: SLIDE_HEIGHT, unit: "in" },
   updatedAt: new Date().toISOString(),
   slides: [

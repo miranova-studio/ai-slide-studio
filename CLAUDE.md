@@ -18,7 +18,7 @@ FRAME is a browser-based slide editor. Preserve JSON import/export compatibility
 ## Current UI and data contract
 
 - The left panel switches between a title outline and thumbnails. The center switches between single-slide, draggable grid, and vertical scroll views. The right panel switches between element editing and per-slide notes.
-- Slide `hidden` and `notes` are persisted in schema v2. Presentation and print use only `!hidden` slides; editing and JSON export keep every slide. The view tabs and selected slide are transient UI state.
+- Slide `hidden`, `notes`, and `showMaster` plus deck `masterElements` are persisted in schema v3. Presentation and print use only `!hidden` slides; editing and JSON export keep every slide. Master elements render behind slide elements and are selectable only in master-edit mode. The view tabs, editing mode, and selected element are transient UI state.
 - Shapes support `rect`, `roundRect`, `ellipse`, `triangle`, `line`, and `arrow`. Keep the schema enum, TypeScript type, editor picker, renderer, and future PPTX mapping in sync.
 - `src/App.tsx` owns in-memory deck undo/redo snapshots; they are never persisted or exported. Route deck edits through `changeDeck`. Pointer move/resize previews update without creating history entries, then commit one snapshot on release. Native contentEditable/input undo takes precedence over deck shortcuts while typing.
 - Text editing begins on double-click and commits on blur. Delete/Backspace removes a selected element only outside editable controls. Thumbnail context menu and the right edit panel both toggle slide visibility.

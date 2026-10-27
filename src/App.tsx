@@ -22,7 +22,12 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import { defaultDeck, makeSlide, makeText } from "./data/defaultDeck";
+import {
+  defaultDeck,
+  makeMasterElements,
+  makeSlide,
+  makeText,
+} from "./data/defaultDeck";
 import { assertDeck, migrateDeck } from "./schema/validate";
 import { loadDeck, saveDeck } from "./services/storage";
 import { SLIDE_HEIGHT, SLIDE_WIDTH } from "./types";
@@ -106,6 +111,8 @@ function elementBox(element: SlideElement): React.CSSProperties {
 
 function SlideCanvas({
   slide,
+  masterElements = [],
+  masterMode = false,
   template,
   editable = false,
   selectedId,
@@ -119,6 +126,8 @@ function SlideCanvas({
   onGestureEnd,
 }: {
   slide: Slide;
+  masterElements?: SlideElement[];
+  masterMode?: boolean;
   template: TemplateId;
   editable?: boolean;
   selectedId?: string;
@@ -141,11 +150,16 @@ function SlideCanvas({
         <span>FRAME</span>
         <span className="slide-count-mark">●</span>
       </div>
-      <div className="accent-shape" aria-hidden="true" />
-      {slide.elements.map((element) => {
+      {[
+        ...(slide.showMaster || masterMode
+          ? masterElements.map((element) => ({ element, master: true }))
+          : []),
+        ...slide.elements.map((element) => ({ element, master: false })),
+      ].map(({ element, master }) => {
+        const canEdit = editable && master === masterMode;
         const box = elementBox(element);
         const selected =
-          editable && selectedId === element.id ? " element-selected" : "";
+          canEdit && selectedId === element.id ? " element-selected" : "";
         return (
           <div
             key={element.id}
@@ -156,17 +170,20 @@ function SlideCanvas({
               ...box,
               opacity:
                 element.type === "text" ? undefined : element.style.opacity,
+              pointerEvents: canEdit ? undefined : "none",
             }}
             onClick={(event) => {
-              event.stopPropagation();
-              onSelect?.(element.id);
+              if (canEdit) {
+                event.stopPropagation();
+                onSelect?.(element.id);
+              }
             }}
             onDoubleClick={() => {
-              if (editable && element.type === "text")
+              if (canEdit && element.type === "text")
                 onStartTextEdit?.(element.id);
             }}
             onPointerDown={(event) => {
-              if (!editable || editingTextId === element.id) return;
+              if (!canEdit || editingTextId === element.id) return;
               onGestureStart?.(event, element, "move");
             }}
             onPointerMove={onGestureMove}
@@ -177,7 +194,7 @@ function SlideCanvas({
               <div
                 className="slide-text-content"
                 data-text-id={element.id}
-                contentEditable={editable && editingTextId === element.id}
+                contentEditable={canEdit && editingTextId === element.id}
                 suppressContentEditableWarning
                 spellCheck={false}
                 style={{
@@ -226,15 +243,23 @@ function SlideCanvas({
                   <polygon
                     points="50,2 98,98 2,98"
                     fill={element.style.fill}
-                    stroke={element.style.stroke || "none"}
-                    strokeWidth={element.style.strokeWidth || 2}
+                    stroke={
+                      (element.style.strokeWidth ?? 0) > 0
+                        ? element.style.stroke || element.style.fill
+                        : "none"
+                    }
+                    strokeWidth={element.style.strokeWidth ?? 2}
                   />
                 ) : element.shape === "arrow" ? (
                   <polygon
                     points="2,34 65,34 65,8 98,50 65,92 65,66 2,66"
                     fill={element.style.fill}
-                    stroke={element.style.stroke || "none"}
-                    strokeWidth={element.style.strokeWidth || 2}
+                    stroke={
+                      (element.style.strokeWidth ?? 0) > 0
+                        ? element.style.stroke || element.style.fill
+                        : "none"
+                    }
+                    strokeWidth={element.style.strokeWidth ?? 2}
                   />
                 ) : (
                   <line
@@ -244,8 +269,8 @@ function SlideCanvas({
                     y2="50"
                     stroke={element.style.stroke || element.style.fill}
                     strokeWidth={Math.max(
-                      2,
-                      (element.style.strokeWidth || 2) * 2,
+                      0,
+                      (element.style.strokeWidth ?? 2) * 2,
                     )}
                   />
                 )}
@@ -255,9 +280,10 @@ function SlideCanvas({
                 className="shape-fill"
                 style={{
                   background: element.style.fill,
-                  border: element.style.stroke
-                    ? `${element.style.strokeWidth || 1}px solid ${element.style.stroke}`
-                    : undefined,
+                  border:
+                    (element.style.strokeWidth ?? 0) > 0
+                      ? `${element.style.strokeWidth}px solid ${element.style.stroke || element.style.fill}`
+                      : undefined,
                   borderRadius:
                     element.shape === "ellipse"
                       ? "50%"
@@ -302,6 +328,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [editingTextId, setEditingTextId] = useState<string | undefined>();
   const [shapeKind, setShapeKind] = useState<ShapeElement["shape"]>("rect");
+  const [masterMode, setMasterMode] = useState(false);
   const [thumbnailMenu, setThumbnailMenu] = useState<{
     slideId: string;
     x: number;
@@ -326,9 +353,9 @@ export default function App() {
   );
   const activeSlide = deck.slides[activeIndex];
   const visibleSlides = deck.slides.filter((slide) => !slide.hidden);
-  const selected = activeSlide?.elements.find(
-    (element) => element.id === selectedId,
-  );
+  const selected = (
+    masterMode ? deck.masterElements : activeSlide?.elements
+  )?.find((element) => element.id === selectedId);
   const templateInfo = useMemo(
     () => templates.find((item) => item.id === deck.template)!,
     [deck.template],
@@ -460,6 +487,16 @@ export default function App() {
     restoreDeck(next);
   }
   function changeSlide(update: (slide: Slide) => Slide) {
+    if (masterMode) {
+      changeDeck((current) => ({
+        ...current,
+        masterElements: update({
+          ...activeSlide,
+          elements: current.masterElements,
+        }).elements,
+      }));
+      return;
+    }
     changeDeck((current) => ({
       ...current,
       slides: current.slides.map((slide) =>
@@ -529,30 +566,45 @@ export default function App() {
   function selectSlide(id: string) {
     setActiveId(id);
     setSelectedId(undefined);
+    setEditingTextId(undefined);
   }
   function addNote() {
     const text = noteText.trim();
     if (!text) return notify("内容を入力してください");
-    changeSlide((slide) => ({
-      ...slide,
-      notes: [
-        ...slide.notes,
-        {
-          id: crypto.randomUUID(),
-          kind: noteKind,
-          text,
-          completed: false,
-          createdAt: new Date().toISOString(),
-        },
-      ],
+    changeDeck((current) => ({
+      ...current,
+      slides: current.slides.map((slide) =>
+        slide.id === activeId
+          ? {
+              ...slide,
+              notes: [
+                ...slide.notes,
+                {
+                  id: crypto.randomUUID(),
+                  kind: noteKind,
+                  text,
+                  completed: false,
+                  createdAt: new Date().toISOString(),
+                },
+              ],
+            }
+          : slide,
+      ),
     }));
     setNoteText("");
   }
   function toggleNote(id: string) {
-    changeSlide((slide) => ({
-      ...slide,
-      notes: slide.notes.map((note) =>
-        note.id === id ? { ...note, completed: !note.completed } : note,
+    changeDeck((current) => ({
+      ...current,
+      slides: current.slides.map((slide) =>
+        slide.id === activeId
+          ? {
+              ...slide,
+              notes: slide.notes.map((note) =>
+                note.id === id ? { ...note, completed: !note.completed } : note,
+              ),
+            }
+          : slide,
       ),
     }));
   }
@@ -723,9 +775,12 @@ export default function App() {
     } as Partial<SlideElement>);
   }
   function updateShapeColor(id: string, key: "fill" | "stroke", value: string) {
-    const current = deckRef.current.slides
-      .find((slide) => slide.id === activeId)
-      ?.elements.find((element) => element.id === id);
+    const current = (
+      masterMode
+        ? deckRef.current.masterElements
+        : deckRef.current.slides.find((slide) => slide.id === activeId)
+            ?.elements
+    )?.find((element) => element.id === id);
     if (current?.type !== "shape" || current.style[key] === value) return;
     updateElement(id, {
       style: { ...current.style, [key]: value },
@@ -746,7 +801,7 @@ export default function App() {
     setSelectedId(element.id);
     gestureRef.current = {
       elementId: element.id,
-      slideId: activeId,
+      slideId: masterMode ? "__master__" : activeId,
       mode,
       startX: event.clientX,
       startY: event.clientY,
@@ -792,12 +847,12 @@ export default function App() {
       width: round2(width),
       height: round2(height),
     };
-    const slide = deckRef.current.slides.find(
-      (item) => item.id === gesture.slideId,
-    );
-    const current = slide?.elements.find(
-      (item) => item.id === gesture.elementId,
-    );
+    const elements =
+      gesture.slideId === "__master__"
+        ? deckRef.current.masterElements
+        : deckRef.current.slides.find((item) => item.id === gesture.slideId)
+            ?.elements;
+    const current = elements?.find((item) => item.id === gesture.elementId);
     if (
       !current ||
       (current.x === geometry.x &&
@@ -809,6 +864,14 @@ export default function App() {
     gesture.changed = true;
     showDeck({
       ...deckRef.current,
+      masterElements:
+        gesture.slideId === "__master__"
+          ? deckRef.current.masterElements.map((entry) =>
+              entry.id === gesture.elementId
+                ? { ...entry, ...geometry }
+                : entry,
+            )
+          : deckRef.current.masterElements,
       slides: deckRef.current.slides.map((item) =>
         item.id === gesture.slideId
           ? {
@@ -984,7 +1047,11 @@ export default function App() {
                         setViewMode("slide");
                       }}
                     >
-                      <SlideCanvas slide={slide} template={deck.template} />
+                      <SlideCanvas
+                        slide={slide}
+                        template={deck.template}
+                        masterElements={deck.masterElements}
+                      />
                     </button>
                     <button
                       className="thumb-delete"
@@ -1011,6 +1078,19 @@ export default function App() {
           </aside>
           <section className="workspace">
             <div className="workspace-bar">
+              <button
+                className={
+                  masterMode ? "master-toggle active" : "master-toggle"
+                }
+                onClick={() => {
+                  setMasterMode((value) => !value);
+                  setSelectedId(undefined);
+                  setEditingTextId(undefined);
+                  setViewMode("slide");
+                }}
+              >
+                {masterMode ? "マスター編集を終了" : "マスター編集"}
+              </button>
               <div
                 className="view-switch"
                 role="tablist"
@@ -1051,6 +1131,8 @@ export default function App() {
               >
                 <SlideCanvas
                   slide={activeSlide}
+                  masterElements={deck.masterElements}
+                  masterMode={masterMode}
                   template={deck.template}
                   editable
                   selectedId={selectedId}
@@ -1062,9 +1144,13 @@ export default function App() {
                   }}
                   onEndTextEdit={() => setEditingTextId(undefined)}
                   onTextChange={(id, text) => {
-                    const current = deckRef.current.slides
-                      .find((slide) => slide.id === activeId)
-                      ?.elements.find((element) => element.id === id);
+                    const current = (
+                      masterMode
+                        ? deckRef.current.masterElements
+                        : deckRef.current.slides.find(
+                            (slide) => slide.id === activeId,
+                          )?.elements
+                    )?.find((element) => element.id === id);
                     if (current?.type === "text" && current.text !== text)
                       updateElement(id, { text } as Partial<TextElement>);
                   }}
@@ -1108,7 +1194,11 @@ export default function App() {
                         if (viewMode === "grid") setViewMode("slide");
                       }}
                     >
-                      <SlideCanvas slide={slide} template={deck.template} />
+                      <SlideCanvas
+                        slide={slide}
+                        template={deck.template}
+                        masterElements={deck.masterElements}
+                      />
                     </button>
                   </div>
                 ))}
@@ -1148,7 +1238,24 @@ export default function App() {
             {panelTab === "edit" ? (
               <>
                 <div className="panel-section visibility-section">
-                  <h3>このスライド</h3>
+                  <h3>{masterMode ? "マスターの柄" : "このスライド"}</h3>
+                  <label className="master-visibility">
+                    <input
+                      type="checkbox"
+                      checked={activeSlide.showMaster}
+                      onChange={(event) =>
+                        changeDeck((current) => ({
+                          ...current,
+                          slides: current.slides.map((slide) =>
+                            slide.id === activeId
+                              ? { ...slide, showMaster: event.target.checked }
+                              : slide,
+                          ),
+                        }))
+                      }
+                    />
+                    このスライドにマスターの柄を表示
+                  </label>
                   <button
                     className={`visibility-toggle ${activeSlide.hidden ? "hidden" : ""}`}
                     onClick={() => toggleSlideHidden(activeSlide.id)}
@@ -1176,6 +1283,7 @@ export default function App() {
                           changeDeck((current) => ({
                             ...current,
                             template: template.id,
+                            masterElements: makeMasterElements(template.id),
                           }))
                         }
                       >
@@ -1355,6 +1463,45 @@ export default function App() {
                               )
                             }
                           />
+                        </label>
+                        <label className="stroke-width-field">
+                          枠線の太さ (0–20)
+                          <span>
+                            <input
+                              type="range"
+                              min="0"
+                              max="20"
+                              step="0.5"
+                              value={selected.style.strokeWidth ?? 0}
+                              onChange={(event) =>
+                                updateElement(selected.id, {
+                                  style: {
+                                    ...selected.style,
+                                    strokeWidth: Number(event.target.value),
+                                  },
+                                } as Partial<ShapeElement>)
+                              }
+                            />
+                            <input
+                              type="number"
+                              min="0"
+                              max="20"
+                              step="0.5"
+                              value={selected.style.strokeWidth ?? 0}
+                              onChange={(event) =>
+                                updateElement(selected.id, {
+                                  style: {
+                                    ...selected.style,
+                                    strokeWidth: clamp(
+                                      Number(event.target.value) || 0,
+                                      0,
+                                      20,
+                                    ),
+                                  },
+                                } as Partial<ShapeElement>)
+                              }
+                            />
+                          </span>
                         </label>
                       </div>
                     )}
@@ -1537,6 +1684,7 @@ export default function App() {
               <SlideCanvas
                 slide={visibleSlides[presentIndex]}
                 template={deck.template}
+                masterElements={deck.masterElements}
               />
             </div>
             <div
@@ -1596,7 +1744,11 @@ export default function App() {
       <div className="print-root" aria-hidden="true">
         {visibleSlides.map((slide) => (
           <div className="print-page" key={slide.id}>
-            <SlideCanvas slide={slide} template={deck.template} />
+            <SlideCanvas
+              slide={slide}
+              template={deck.template}
+              masterElements={deck.masterElements}
+            />
           </div>
         ))}
       </div>

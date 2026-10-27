@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 export const SLIDE_WIDTH = 13.333;
 export const SLIDE_HEIGHT = 7.5;
 export type TemplateId = "paper" | "ink" | "signal";
@@ -54,12 +54,14 @@ export interface Slide {
   elements: SlideElement[];
   hidden: boolean;
   notes: SlideNote[];
+  showMaster: boolean;
 }
 export interface Deck {
   schemaVersion: number;
   id: string;
   title: string;
   template: TemplateId;
+  masterElements: SlideElement[];
   canvas: { width: number; height: number; unit: "in" };
   slides: Slide[];
   updatedAt: string;

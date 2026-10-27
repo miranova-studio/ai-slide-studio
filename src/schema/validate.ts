@@ -3,7 +3,7 @@ import addFormats from "ajv-formats";
 import deckSchema from "./slide-deck.schema.json";
 import { SCHEMA_VERSION, SLIDE_HEIGHT, SLIDE_WIDTH } from "../types";
 import type { Deck, Slide } from "../types";
-import { makeSlide } from "../data/defaultDeck";
+import { makeMasterElements, makeSlide } from "../data/defaultDeck";
 
 const ajv = new Ajv2020({ allErrors: true });
 addFormats(ajv);
@@ -31,6 +31,7 @@ export function migrateDeck(input: unknown): Deck {
     throw new Error("JSONの形式が正しくありません");
   const version = (input as { schemaVersion?: unknown }).schemaVersion;
   if (version === SCHEMA_VERSION) return assertDeck(input);
+  if (version === 2) return assertDeck(migrateV2(input));
   if (version === 1) return assertDeck(migrateV1(input));
   if (version === undefined || version === 0)
     return assertDeck(migrateLegacy(input as LegacyDeck));
@@ -41,14 +42,24 @@ function migrateV1(input: unknown): Deck {
   const old = input as Deck;
   if (!Array.isArray(old.slides) || old.slides.length === 0)
     throw new Error("移行できるスライドがありません");
-  return {
+  return migrateV2({
     ...old,
-    schemaVersion: SCHEMA_VERSION,
+    schemaVersion: 2,
     slides: old.slides.map((slide) => ({
       ...slide,
       hidden: false,
       notes: [],
     })),
+  });
+}
+
+function migrateV2(input: unknown): Deck {
+  const old = input as Deck;
+  return {
+    ...old,
+    schemaVersion: SCHEMA_VERSION,
+    masterElements: makeMasterElements(old.template),
+    slides: old.slides.map((slide) => ({ ...slide, showMaster: true })),
   };
 }
 
@@ -82,9 +93,14 @@ function migrateLegacy(legacy: LegacyDeck): Deck {
     template: ["paper", "ink", "signal"].includes(legacy.template || "")
       ? legacy.template!
       : "paper",
+    masterElements: makeMasterElements(
+      ["paper", "ink", "signal"].includes(legacy.template || "")
+        ? legacy.template!
+        : "paper",
+    ),
     canvas: { width: SLIDE_WIDTH, height: SLIDE_HEIGHT, unit: "in" },
     updatedAt: new Date().toISOString(),
-    slides,
+    slides: slides.map((slide) => ({ ...slide, showMaster: true })),
   };
 }
 
@@ -95,7 +111,7 @@ export function assertDeck(input: unknown): Deck {
       `JSON Schema違反: ${issue?.instancePath || "/"} ${issue?.message || ""}`,
     );
   }
-  for (const slide of input.slides) {
+  for (const slide of [{ elements: input.masterElements }, ...input.slides]) {
     for (const element of slide.elements) {
       if (
         element.x + element.width > SLIDE_WIDTH + 0.001 ||

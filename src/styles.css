@@ -294,31 +294,12 @@ main {
   color: #262521;
   background: #f5f0e5;
 }
-.template-paper .accent-shape {
-  width: 25%;
-  height: 80%;
-  right: -10%;
-  bottom: -20%;
-  background: #dc6339;
-  transform: rotate(18deg);
-}
 .template-paper .slide-count-mark {
   color: #e15c30;
 }
 .template-ink {
   color: #f4f0e7;
   background: #151b24;
-}
-.template-ink .accent-shape {
-  width: 38%;
-  aspect-ratio: 1;
-  border: 1px solid #7ebcff55;
-  border-radius: 50%;
-  right: -12%;
-  top: -22%;
-  box-shadow:
-    0 0 0 3em #7ebcff0a,
-    0 0 0 7em #7ebcff08;
 }
 .template-ink .slide-count-mark {
   color: #8cc8ff;
@@ -327,13 +308,33 @@ main {
   color: #161511;
   background: #f4db3d;
 }
-.template-signal .accent-shape {
-  width: 20%;
-  height: 100%;
-  right: 0;
-  top: 0;
-  background: #f05237;
-  clip-path: polygon(40% 0, 100% 0, 100% 100%, 0 100%);
+.accent-shape {
+  display: none;
+}
+.master-toggle.active {
+  background: var(--ui-primary);
+  color: white;
+}
+.master-visibility {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+.stroke-width-field {
+  grid-column: 1 / -1;
+}
+.stroke-width-field span {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.stroke-width-field input[type="range"] {
+  flex: 1;
+}
+.stroke-width-field input[type="number"] {
+  width: 64px;
 }
 .template-signal .slide-count-mark {
   color: #f05237;
