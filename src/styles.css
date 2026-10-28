@@ -311,9 +311,49 @@ main {
 .accent-shape {
   display: none;
 }
-.master-toggle.active {
+.master-menu-button {
+  background: var(--ui-primary-soft);
+  color: var(--ui-primary);
+  font-weight: 700;
+}
+.master-menu-button.active {
   background: var(--ui-primary);
   color: white;
+}
+.master-mode-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 9px 16px;
+  background: var(--ui-primary-soft);
+  border-bottom: 2px solid var(--ui-primary);
+  color: var(--ui-text);
+  font-size: 12px;
+}
+.master-mode-banner div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.master-mode-banner strong {
+  color: var(--ui-primary);
+  font-size: 13px;
+}
+.master-mode-banner button {
+  border: 1px solid var(--ui-primary);
+  border-radius: 6px;
+  background: white;
+  color: var(--ui-primary);
+  padding: 6px 10px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.view-switch button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 .master-visibility {
   display: flex;

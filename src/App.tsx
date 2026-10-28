@@ -8,6 +8,7 @@ import {
   FileText,
   Image as ImageIcon,
   LayoutGrid,
+  Layers3,
   ListOrdered,
   MonitorPlay,
   Plus,
@@ -1060,6 +1061,22 @@ export default function App() {
           </div>
           <div className="header-actions">
             <button
+              className={
+                masterMode ? "master-menu-button active" : "master-menu-button"
+              }
+              aria-pressed={masterMode}
+              onClick={() => {
+                setMasterMode((value) => !value);
+                setSelectedId(undefined);
+                setEditingTextId(undefined);
+                setPanelTab("edit");
+                setViewMode("slide");
+              }}
+            >
+              <Layers3 size={16} />
+              {masterMode ? "マスター編集中" : "マスター編集"}
+            </button>
+            <button
               className="ghost history-button"
               onClick={undo}
               disabled={!historyRef.current.past.length}
@@ -1212,20 +1229,27 @@ export default function App() {
             </button>
           </aside>
           <section className="workspace">
+            {masterMode && (
+              <div className="master-mode-banner" role="status">
+                <div>
+                  <strong>マスター編集中</strong>
+                  <span>
+                    柄をクリックして色・位置を編集。変更は全スライドに反映されます。
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    setMasterMode(false);
+                    setSelectedId(undefined);
+                    setEditingTextId(undefined);
+                  }}
+                >
+                  通常編集に戻る
+                </button>
+              </div>
+            )}
             <div className="workspace-bar">
-              <button
-                className={
-                  masterMode ? "master-toggle active" : "master-toggle"
-                }
-                onClick={() => {
-                  setMasterMode((value) => !value);
-                  setSelectedId(undefined);
-                  setEditingTextId(undefined);
-                  setViewMode("slide");
-                }}
-              >
-                {masterMode ? "マスター編集を終了" : "マスター編集"}
-              </button>
+              <span>{masterMode ? "マスターの柄を編集" : "スライド編集"}</span>
               <div
                 className="view-switch"
                 role="tablist"
@@ -1243,6 +1267,7 @@ export default function App() {
                   role="tab"
                   aria-selected={viewMode === "grid"}
                   className={viewMode === "grid" ? "active" : ""}
+                  disabled={masterMode}
                   onClick={() => setViewMode("grid")}
                 >
                   一覧
@@ -1251,6 +1276,7 @@ export default function App() {
                   role="tab"
                   aria-selected={viewMode === "scroll"}
                   className={viewMode === "scroll" ? "active" : ""}
+                  disabled={masterMode}
                   onClick={() => setViewMode("scroll")}
                 >
                   スクロール
@@ -1262,7 +1288,7 @@ export default function App() {
             </div>
             {viewMode === "slide" ? (
               <div
-                className={`canvas-wrap ${activeSlide.hidden ? "is-hidden" : ""}`}
+                className={`canvas-wrap ${activeSlide.hidden && !masterMode ? "is-hidden" : ""}`}
               >
                 <SlideCanvas
                   slide={activeSlide}
