@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -22,14 +22,31 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import {
-  defaultDeck,
-  makeMasterElements,
-  makeSlide,
-  makeText,
-} from "./data/defaultDeck";
+import { defaultDeck, makeSlide, makeText } from "./data/defaultDeck";
 import { assertDeck, migrateDeck } from "./schema/validate";
-import { loadDeck, saveDeck } from "./services/storage";
+import {
+  loadDeck,
+  saveDeck,
+  loadCustomThemes,
+  saveCustomTheme,
+} from "./services/storage";
+import { ThemePanel } from "./components/ThemePanel";
+import miranovaPalettes from "./data/miranova-palettes.json";
+import {
+  assertTheme,
+  applyThemeToDeck,
+  applyPaletteToDeck,
+  builtInThemes,
+  mappedPalette,
+  layoutSlide,
+} from "./themes";
+import type {
+  Theme,
+  ThemePalette,
+  ThemeFonts,
+  MiranovaPalette,
+  PaletteMapping,
+} from "./themes";
 import { SLIDE_HEIGHT, SLIDE_WIDTH } from "./types";
 import type {
   Deck,
@@ -42,19 +59,9 @@ import type {
 } from "./types";
 import "./styles.css";
 
-const templates: { id: TemplateId; label: string; description: string }[] = [
-  {
-    id: "paper",
-    label: "Editorial",
-    description: "静かな余白とタイポグラフィ",
-  },
-  { id: "ink", label: "Midnight", description: "暗色で集中を引き出す" },
-  { id: "signal", label: "Signal", description: "鮮やかな色と大胆な構成" },
-];
-
 type ViewMode = "slide" | "grid" | "scroll";
 type RailTab = "outline" | "thumbnails";
-type PanelTab = "edit" | "notes";
+type PanelTab = "edit" | "notes" | "theme";
 type ResizeCorner = "nw" | "ne" | "sw" | "se";
 type GestureMode = "move" | ResizeCorner;
 const shapeLabels: { value: ShapeElement["shape"]; label: string }[] = [
@@ -114,6 +121,8 @@ function SlideCanvas({
   masterElements = [],
   masterMode = false,
   template,
+  palette,
+  fonts,
   editable = false,
   selectedId,
   editingTextId,
@@ -129,6 +138,8 @@ function SlideCanvas({
   masterElements?: SlideElement[];
   masterMode?: boolean;
   template: TemplateId;
+  palette: ThemePalette;
+  fonts: ThemeFonts;
   editable?: boolean;
   selectedId?: string;
   editingTextId?: string;
@@ -145,10 +156,15 @@ function SlideCanvas({
   onGestureEnd?: (event: React.PointerEvent<HTMLDivElement>) => void;
 }) {
   return (
-    <div className={`slide-canvas template-${template}`}>
-      <div className="slide-chrome">
+    <div
+      className={`slide-canvas template-${template}`}
+      style={{ background: palette.background, color: palette.text }}
+    >
+      <div className="slide-chrome" style={{ color: palette.main }}>
         <span>FRAME</span>
-        <span className="slide-count-mark">●</span>
+        <span className="slide-count-mark" style={{ color: palette.accent }}>
+          ●
+        </span>
       </div>
       {[
         ...(slide.showMaster || masterMode
@@ -199,7 +215,8 @@ function SlideCanvas({
                 spellCheck={false}
                 style={{
                   fontFamily:
-                    element.style.fontFamily || "'Noto Sans JP', sans-serif",
+                    element.style.fontFamily ||
+                    (element.style.bold ? fonts.heading : fonts.body),
                   fontSize: `${(element.style.fontSize / 72 / SLIDE_WIDTH) * 100}cqw`,
                   color: element.style.color || undefined,
                   fontWeight: element.style.bold ? 700 : 400,
@@ -328,6 +345,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [editingTextId, setEditingTextId] = useState<string | undefined>();
   const [shapeKind, setShapeKind] = useState<ShapeElement["shape"]>("rect");
+  const [customThemes, setCustomThemes] = useState<Theme[]>([]);
   const [masterMode, setMasterMode] = useState(false);
   const [thumbnailMenu, setThumbnailMenu] = useState<{
     slideId: string;
@@ -356,10 +374,9 @@ export default function App() {
   const selected = (
     masterMode ? deck.masterElements : activeSlide?.elements
   )?.find((element) => element.id === selectedId);
-  const templateInfo = useMemo(
-    () => templates.find((item) => item.id === deck.template)!,
-    [deck.template],
-  );
+  const themes = [...builtInThemes, ...customThemes];
+  const activeTheme =
+    themes.find((item) => item.id === deck.themeId) || builtInThemes[0];
 
   useEffect(() => {
     loadDeck()
@@ -376,6 +393,12 @@ export default function App() {
         ),
       )
       .finally(() => setReady(true));
+  }, []);
+
+  useEffect(() => {
+    loadCustomThemes()
+      .then((loaded) => setCustomThemes(loaded.map(assertTheme)))
+      .catch(() => notify("保存済みテーマを読めませんでした"));
   }, []);
 
   useEffect(() => {
@@ -522,7 +545,7 @@ export default function App() {
     setSelectedId(element.id);
   }
   function addSlide() {
-    const next = makeSlide();
+    const next = layoutSlide(makeSlide(), activeTheme, "body");
     changeDeck((current) => {
       const slides = [...current.slides];
       slides.splice(activeIndex + 1, 0, next);
@@ -672,6 +695,112 @@ export default function App() {
       notify(error instanceof Error ? error.message : "JSONを書き出せません");
     }
   }
+  function downloadJson(value: unknown, filename: string) {
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(value, null, 2)], { type: "application/json" }),
+    );
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  function applyPalette(palette: MiranovaPalette, mapping: PaletteMapping) {
+    changeDeck((current) =>
+      applyPaletteToDeck(
+        current,
+        mappedPalette(palette, mapping),
+        palette.id,
+        mapping,
+      ),
+    );
+  }
+  async function importTheme(file: File) {
+    try {
+      const theme = assertTheme(JSON.parse(await file.text()));
+      await saveCustomTheme(theme);
+      setCustomThemes((current) => [
+        ...current.filter((item) => item.id !== theme.id),
+        theme,
+      ]);
+      changeDeck((current) => applyThemeToDeck(current, theme));
+      setSelectedId(undefined);
+      notify(`テーマ「${theme.name}」を取り込みました`);
+    } catch (error) {
+      notify(
+        error instanceof Error ? error.message : "テーマを取り込めませんでした",
+      );
+    }
+  }
+  function exportTheme() {
+    const theme: Theme = {
+      ...activeTheme,
+      palette: deck.palette,
+      masterElements: deck.masterElements.filter(
+        (item): item is Theme["masterElements"][number] =>
+          item.type === "shape" || item.type === "image",
+      ),
+    };
+    downloadJson(assertTheme(theme), `${theme.id}.json`);
+    notify("テーマJSONを書き出しました");
+  }
+  async function saveTheme(name: string, toFolder = false) {
+    try {
+      const paletteData = miranovaPalettes as MiranovaPalette[];
+      const picked = paletteData.find((item) => item.id === deck.paletteId);
+      const label = picked
+        ? `${picked.name} (${picked.id})`
+        : deck.paletteId === "custom"
+          ? "貼り付けパレット (custom)"
+          : "独自配色 (custom)";
+      const id =
+        `custom-${deck.paletteId || "theme"}-${Date.now().toString(36)}`.toLowerCase();
+      const theme: Theme = assertTheme({
+        ...activeTheme,
+        id,
+        name: `${name.trim() || activeTheme.name} / ${label}`,
+        category: "カスタム",
+        palette: deck.palette,
+        masterElements: deck.masterElements.filter(
+          (item): item is Theme["masterElements"][number] =>
+            item.type === "shape" || item.type === "image",
+        ),
+      });
+      if (toFolder) {
+        const picker = (
+          window as unknown as {
+            showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
+          }
+        ).showDirectoryPicker;
+        if (!picker)
+          throw new Error(
+            "このブラウザはフォルダ保存に未対応です。JSON書き出しを使ってください",
+          );
+        const directory = await picker();
+        if (directory.name !== "themes")
+          throw new Error("themes フォルダを選択してください");
+        const handle = await directory.getFileHandle(`${theme.id}.json`, {
+          create: true,
+        });
+        const writable = await handle.createWritable();
+        await writable.write(`${JSON.stringify(theme, null, 2)}\n`);
+        await writable.close();
+      }
+      await saveCustomTheme(theme);
+      setCustomThemes((current) => [...current, theme]);
+      changeDeck((current) => ({ ...current, themeId: theme.id }));
+      if (!toFolder) downloadJson(theme, `${theme.id}.json`);
+      notify(
+        toFolder
+          ? "themes/ に保存しました。開発サーバーを再読み込みするとテーマ一覧にも反映されます"
+          : "テーマをブラウザに保存し、JSONを書き出しました。themes/ に配置するとソース管理できます",
+      );
+    } catch (error) {
+      notify(
+        error instanceof Error ? error.message : "テーマを保存できませんでした",
+      );
+    }
+  }
   function generateDraft() {
     const paragraphs = script
       .split(/\n\s*\n/)
@@ -683,12 +812,16 @@ export default function App() {
         .split("\n")
         .map((line) => line.trim())
         .filter(Boolean);
-      return makeSlide(
-        index === 0
-          ? "OVERVIEW"
-          : `SECTION ${String(index + 1).padStart(2, "0")}`,
-        lines[0] || "新しいスライド",
-        lines.slice(1).join("\n") || "補足をここに追加できます。",
+      return layoutSlide(
+        makeSlide(
+          index === 0
+            ? "OVERVIEW"
+            : `SECTION ${String(index + 1).padStart(2, "0")}`,
+          lines[0] || "新しいスライド",
+          lines.slice(1).join("\n") || "補足をここに追加できます。",
+        ),
+        activeTheme,
+        index === 0 ? "title" : "body",
       );
     });
     changeDeck((current) => ({
@@ -922,7 +1055,7 @@ export default function App() {
               }
             />
             <span>
-              {deck.slides.length} slides · {templateInfo.label}
+              {deck.slides.length} slides · {activeTheme.name}
             </span>
           </div>
           <div className="header-actions">
@@ -1050,6 +1183,8 @@ export default function App() {
                       <SlideCanvas
                         slide={slide}
                         template={deck.template}
+                        palette={deck.palette}
+                        fonts={activeTheme.fonts}
                         masterElements={deck.masterElements}
                       />
                     </button>
@@ -1134,6 +1269,8 @@ export default function App() {
                   masterElements={deck.masterElements}
                   masterMode={masterMode}
                   template={deck.template}
+                  palette={deck.palette}
+                  fonts={activeTheme.fonts}
                   editable
                   selectedId={selectedId}
                   editingTextId={editingTextId}
@@ -1197,6 +1334,8 @@ export default function App() {
                       <SlideCanvas
                         slide={slide}
                         template={deck.template}
+                        palette={deck.palette}
+                        fonts={activeTheme.fonts}
                         masterElements={deck.masterElements}
                       />
                     </button>
@@ -1233,6 +1372,14 @@ export default function App() {
                 onClick={() => setPanelTab("notes")}
               >
                 メモ・修正指示
+              </button>
+              <button
+                role="tab"
+                aria-selected={panelTab === "theme"}
+                className={panelTab === "theme" ? "active" : ""}
+                onClick={() => setPanelTab("theme")}
+              >
+                テーマ
               </button>
             </div>
             {panelTab === "edit" ? (
@@ -1272,31 +1419,9 @@ export default function App() {
                 </div>
                 <div className="panel-section">
                   <h3>デザイン</h3>
-                  <div className="template-list">
-                    {templates.map((template) => (
-                      <button
-                        key={template.id}
-                        className={
-                          deck.template === template.id ? "selected" : ""
-                        }
-                        onClick={() =>
-                          changeDeck((current) => ({
-                            ...current,
-                            template: template.id,
-                            masterElements: makeMasterElements(template.id),
-                          }))
-                        }
-                      >
-                        <span
-                          className={`template-swatch swatch-${template.id}`}
-                        />
-                        <span>
-                          <strong>{template.label}</strong>
-                          <small>{template.description}</small>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
+                  <button onClick={() => setPanelTab("theme")}>
+                    テーマ・パレットを選ぶ
+                  </button>
                 </div>
                 <div className="panel-section">
                   <h3>要素を追加</h3>
@@ -1539,6 +1664,23 @@ export default function App() {
                   </button>
                 </div>
               </>
+            ) : panelTab === "theme" ? (
+              <ThemePanel
+                themes={themes}
+                themeId={deck.themeId}
+                mapping={deck.paletteMapping}
+                paletteId={deck.paletteId}
+                onTheme={(theme) => {
+                  changeDeck((current) => applyThemeToDeck(current, theme));
+                  setSelectedId(undefined);
+                }}
+                onPalette={applyPalette}
+                onImport={importTheme}
+                onExport={exportTheme}
+                onSave={(name) => saveTheme(name)}
+                onSaveToFolder={(name) => saveTheme(name, true)}
+                notify={notify}
+              />
             ) : (
               <div className="notes-panel">
                 <div className="panel-section">
@@ -1684,6 +1826,8 @@ export default function App() {
               <SlideCanvas
                 slide={visibleSlides[presentIndex]}
                 template={deck.template}
+                palette={deck.palette}
+                fonts={activeTheme.fonts}
                 masterElements={deck.masterElements}
               />
             </div>
@@ -1747,6 +1891,8 @@ export default function App() {
             <SlideCanvas
               slide={slide}
               template={deck.template}
+              palette={deck.palette}
+              fonts={activeTheme.fonts}
               masterElements={deck.masterElements}
             />
           </div>

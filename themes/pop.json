@@ -1,0 +1,126 @@
+{
+  "themeVersion": 1,
+  "id": "pop",
+  "name": "ポップ",
+  "category": "ポップ",
+  "palette": {
+    "background": "#FFF8DD",
+    "main": "#623AC9",
+    "accent": "#FF5E83",
+    "text": "#281B4E"
+  },
+  "fonts": {
+    "heading": "Arial Rounded MT Bold, Arial, sans-serif",
+    "body": "'Noto Sans JP', sans-serif"
+  },
+  "masterElements": [
+    {
+      "id": "pop-ornament-1",
+      "type": "shape",
+      "shape": "ellipse",
+      "x": 10.75,
+      "y": 0.65,
+      "width": 2.1,
+      "height": 2.1,
+      "style": {
+        "fill": "#623AC9",
+        "opacity": 1,
+        "strokeWidth": 0
+      }
+    },
+    {
+      "id": "pop-ornament-2",
+      "type": "shape",
+      "shape": "triangle",
+      "x": 0.45,
+      "y": 5.8,
+      "width": 1.7,
+      "height": 1.5,
+      "style": {
+        "fill": "#FF5E83",
+        "opacity": 0.8,
+        "strokeWidth": 0
+      }
+    }
+  ],
+  "layouts": {
+    "title": {
+      "eyebrow": {
+        "x": 0.85,
+        "y": 1.42,
+        "width": 10,
+        "height": 0.35
+      },
+      "title": {
+        "x": 0.85,
+        "y": 1.7,
+        "width": 10.8,
+        "height": 2.3
+      },
+      "body": {
+        "x": 0.85,
+        "y": 5.2,
+        "width": 10.3,
+        "height": 1
+      },
+      "image": {
+        "x": 8,
+        "y": 1.55,
+        "width": 4.45,
+        "height": 4.8
+      }
+    },
+    "body": {
+      "eyebrow": {
+        "x": 0.85,
+        "y": 1.42,
+        "width": 10,
+        "height": 0.35
+      },
+      "title": {
+        "x": 0.85,
+        "y": 1.9,
+        "width": 10.8,
+        "height": 1.8
+      },
+      "body": {
+        "x": 0.85,
+        "y": 4.9,
+        "width": 10.3,
+        "height": 1.15
+      },
+      "image": {
+        "x": 8,
+        "y": 1.55,
+        "width": 4.45,
+        "height": 4.8
+      }
+    },
+    "image": {
+      "eyebrow": {
+        "x": 0.85,
+        "y": 1.42,
+        "width": 10,
+        "height": 0.35
+      },
+      "title": {
+        "x": 0.85,
+        "y": 1.9,
+        "width": 6.1,
+        "height": 1.8
+      },
+      "body": {
+        "x": 0.85,
+        "y": 4.9,
+        "width": 5.9,
+        "height": 1.15
+      },
+      "image": {
+        "x": 7.45,
+        "y": 1.55,
+        "width": 4.95,
+        "height": 4.8
+      }
+    }
+  }
+}

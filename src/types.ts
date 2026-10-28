@@ -1,4 +1,5 @@
-export const SCHEMA_VERSION = 3;
+import type { ThemePalette, PaletteMapping } from "./themes";
+export const SCHEMA_VERSION = 4;
 export const SLIDE_WIDTH = 13.333;
 export const SLIDE_HEIGHT = 7.5;
 export type TemplateId = "paper" | "ink" | "signal";
@@ -61,6 +62,10 @@ export interface Deck {
   id: string;
   title: string;
   template: TemplateId;
+  themeId: string;
+  palette: ThemePalette;
+  paletteId?: string;
+  paletteMapping: PaletteMapping;
   masterElements: SlideElement[];
   canvas: { width: number; height: number; unit: "in" };
   slides: Slide[];

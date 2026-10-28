@@ -1,0 +1,126 @@
+{
+  "themeVersion": 1,
+  "id": "tech",
+  "name": "テック",
+  "category": "テック",
+  "palette": {
+    "background": "#071522",
+    "main": "#37D3E9",
+    "accent": "#B4F272",
+    "text": "#E9F7FA"
+  },
+  "fonts": {
+    "heading": "Menlo, Consolas, monospace",
+    "body": "Arial, 'Noto Sans JP', sans-serif"
+  },
+  "masterElements": [
+    {
+      "id": "tech-ornament-1",
+      "type": "shape",
+      "shape": "rect",
+      "x": 0.7,
+      "y": 0.7,
+      "width": 0.09,
+      "height": 6.1,
+      "style": {
+        "fill": "#37D3E9",
+        "opacity": 0.9,
+        "strokeWidth": 0
+      }
+    },
+    {
+      "id": "tech-ornament-2",
+      "type": "shape",
+      "shape": "line",
+      "x": 9.5,
+      "y": 6.2,
+      "width": 3,
+      "height": 0.05,
+      "style": {
+        "fill": "#B4F272",
+        "opacity": 0.8,
+        "strokeWidth": 2
+      }
+    }
+  ],
+  "layouts": {
+    "title": {
+      "eyebrow": {
+        "x": 1.2,
+        "y": 1.42,
+        "width": 10,
+        "height": 0.35
+      },
+      "title": {
+        "x": 1.2,
+        "y": 1.8,
+        "width": 10.4,
+        "height": 2.15
+      },
+      "body": {
+        "x": 1.2,
+        "y": 5.1499999999999995,
+        "width": 10,
+        "height": 1
+      },
+      "image": {
+        "x": 8,
+        "y": 1.55,
+        "width": 4.45,
+        "height": 4.8
+      }
+    },
+    "body": {
+      "eyebrow": {
+        "x": 1.2,
+        "y": 1.42,
+        "width": 10,
+        "height": 0.35
+      },
+      "title": {
+        "x": 1.2,
+        "y": 2,
+        "width": 10.4,
+        "height": 1.65
+      },
+      "body": {
+        "x": 1.2,
+        "y": 4.85,
+        "width": 10,
+        "height": 1.15
+      },
+      "image": {
+        "x": 8,
+        "y": 1.55,
+        "width": 4.45,
+        "height": 4.8
+      }
+    },
+    "image": {
+      "eyebrow": {
+        "x": 1.2,
+        "y": 1.42,
+        "width": 10,
+        "height": 0.35
+      },
+      "title": {
+        "x": 1.2,
+        "y": 2,
+        "width": 6.1,
+        "height": 1.65
+      },
+      "body": {
+        "x": 1.2,
+        "y": 4.85,
+        "width": 5.9,
+        "height": 1.15
+      },
+      "image": {
+        "x": 7.45,
+        "y": 1.55,
+        "width": 4.95,
+        "height": 4.8
+      }
+    }
+  }
+}

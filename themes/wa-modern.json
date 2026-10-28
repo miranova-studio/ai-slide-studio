@@ -1,0 +1,126 @@
+{
+  "themeVersion": 1,
+  "id": "wa-modern",
+  "name": "和モダン",
+  "category": "和モダン",
+  "palette": {
+    "background": "#F7F1E6",
+    "main": "#273B69",
+    "accent": "#C84B3B",
+    "text": "#211D1B"
+  },
+  "fonts": {
+    "heading": "'Noto Serif JP', YuMincho, serif",
+    "body": "'Noto Sans JP', sans-serif"
+  },
+  "masterElements": [
+    {
+      "id": "wa-modern-ornament-1",
+      "type": "shape",
+      "shape": "rect",
+      "x": 0.6,
+      "y": 0.7,
+      "width": 0.23,
+      "height": 6,
+      "style": {
+        "fill": "#273B69",
+        "opacity": 0.9,
+        "strokeWidth": 0
+      }
+    },
+    {
+      "id": "wa-modern-ornament-2",
+      "type": "shape",
+      "shape": "ellipse",
+      "x": 10.6,
+      "y": 0.65,
+      "width": 1.65,
+      "height": 1.65,
+      "style": {
+        "fill": "#C84B3B",
+        "opacity": 0.8,
+        "strokeWidth": 0
+      }
+    }
+  ],
+  "layouts": {
+    "title": {
+      "eyebrow": {
+        "x": 1.35,
+        "y": 1.42,
+        "width": 9.9,
+        "height": 0.35
+      },
+      "title": {
+        "x": 1.35,
+        "y": 1.75,
+        "width": 9.9,
+        "height": 2.2
+      },
+      "body": {
+        "x": 1.35,
+        "y": 5.2,
+        "width": 9.6,
+        "height": 1
+      },
+      "image": {
+        "x": 8,
+        "y": 1.55,
+        "width": 4.45,
+        "height": 4.8
+      }
+    },
+    "body": {
+      "eyebrow": {
+        "x": 1.35,
+        "y": 1.42,
+        "width": 9.9,
+        "height": 0.35
+      },
+      "title": {
+        "x": 1.35,
+        "y": 1.95,
+        "width": 9.9,
+        "height": 1.7
+      },
+      "body": {
+        "x": 1.35,
+        "y": 4.9,
+        "width": 9.6,
+        "height": 1.15
+      },
+      "image": {
+        "x": 8,
+        "y": 1.55,
+        "width": 4.45,
+        "height": 4.8
+      }
+    },
+    "image": {
+      "eyebrow": {
+        "x": 1.35,
+        "y": 1.42,
+        "width": 9.9,
+        "height": 0.35
+      },
+      "title": {
+        "x": 1.35,
+        "y": 1.95,
+        "width": 6.1,
+        "height": 1.7
+      },
+      "body": {
+        "x": 1.35,
+        "y": 4.9,
+        "width": 5.9,
+        "height": 1.15
+      },
+      "image": {
+        "x": 7.45,
+        "y": 1.55,
+        "width": 4.95,
+        "height": 4.8
+      }
+    }
+  }
+}

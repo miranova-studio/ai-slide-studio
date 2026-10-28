@@ -1,0 +1,126 @@
+{
+  "themeVersion": 1,
+  "id": "natural",
+  "name": "ナチュラル",
+  "category": "ナチュラル",
+  "palette": {
+    "background": "#F6F3E9",
+    "main": "#4F7258",
+    "accent": "#C9855A",
+    "text": "#26362A"
+  },
+  "fonts": {
+    "heading": "Georgia, 'Noto Serif JP', serif",
+    "body": "'Noto Sans JP', sans-serif"
+  },
+  "masterElements": [
+    {
+      "id": "natural-ornament-1",
+      "type": "shape",
+      "shape": "ellipse",
+      "x": 10.2,
+      "y": 0.4,
+      "width": 2.5,
+      "height": 2.5,
+      "style": {
+        "fill": "#4F7258",
+        "opacity": 0.35,
+        "strokeWidth": 0
+      }
+    },
+    {
+      "id": "natural-ornament-2",
+      "type": "shape",
+      "shape": "roundRect",
+      "x": 0.45,
+      "y": 6.8,
+      "width": 4,
+      "height": 0.3,
+      "style": {
+        "fill": "#C9855A",
+        "opacity": 0.55,
+        "strokeWidth": 0
+      }
+    }
+  ],
+  "layouts": {
+    "title": {
+      "eyebrow": {
+        "x": 1.25,
+        "y": 1.42,
+        "width": 10,
+        "height": 0.35
+      },
+      "title": {
+        "x": 1.25,
+        "y": 1.8499999999999999,
+        "width": 10,
+        "height": 2.1
+      },
+      "body": {
+        "x": 1.25,
+        "y": 5.1499999999999995,
+        "width": 9.9,
+        "height": 1
+      },
+      "image": {
+        "x": 8,
+        "y": 1.55,
+        "width": 4.45,
+        "height": 4.8
+      }
+    },
+    "body": {
+      "eyebrow": {
+        "x": 1.25,
+        "y": 1.42,
+        "width": 10,
+        "height": 0.35
+      },
+      "title": {
+        "x": 1.25,
+        "y": 2.05,
+        "width": 10,
+        "height": 1.6
+      },
+      "body": {
+        "x": 1.25,
+        "y": 4.85,
+        "width": 9.9,
+        "height": 1.15
+      },
+      "image": {
+        "x": 8,
+        "y": 1.55,
+        "width": 4.45,
+        "height": 4.8
+      }
+    },
+    "image": {
+      "eyebrow": {
+        "x": 1.25,
+        "y": 1.42,
+        "width": 10,
+        "height": 0.35
+      },
+      "title": {
+        "x": 1.25,
+        "y": 2.05,
+        "width": 6.1,
+        "height": 1.6
+      },
+      "body": {
+        "x": 1.25,
+        "y": 4.85,
+        "width": 5.9,
+        "height": 1.15
+      },
+      "image": {
+        "x": 7.45,
+        "y": 1.55,
+        "width": 4.95,
+        "height": 4.8
+      }
+    }
+  }
+}

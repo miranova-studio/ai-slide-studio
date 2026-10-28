@@ -1,0 +1,112 @@
+{
+  "themeVersion": 1,
+  "id": "minimal",
+  "name": "ミニマル",
+  "category": "ミニマル",
+  "palette": {
+    "background": "#FFFFFF",
+    "main": "#111827",
+    "accent": "#A7AAB3",
+    "text": "#111827"
+  },
+  "fonts": {
+    "heading": "Helvetica Neue, Arial, sans-serif",
+    "body": "Arial, 'Noto Sans JP', sans-serif"
+  },
+  "masterElements": [
+    {
+      "id": "minimal-ornament-1",
+      "type": "shape",
+      "shape": "line",
+      "x": 1.05,
+      "y": 1.2,
+      "width": 11.2,
+      "height": 0.03,
+      "style": {
+        "fill": "#111827",
+        "opacity": 1,
+        "strokeWidth": 2
+      }
+    }
+  ],
+  "layouts": {
+    "title": {
+      "eyebrow": {
+        "x": 1.05,
+        "y": 1.42,
+        "width": 10,
+        "height": 0.35
+      },
+      "title": {
+        "x": 1.05,
+        "y": 1.8,
+        "width": 10.7,
+        "height": 1.85
+      },
+      "body": {
+        "x": 1.05,
+        "y": 5.1,
+        "width": 9.8,
+        "height": 1
+      },
+      "image": {
+        "x": 8,
+        "y": 1.55,
+        "width": 4.45,
+        "height": 4.8
+      }
+    },
+    "body": {
+      "eyebrow": {
+        "x": 1.05,
+        "y": 1.42,
+        "width": 10,
+        "height": 0.35
+      },
+      "title": {
+        "x": 1.05,
+        "y": 2,
+        "width": 10.7,
+        "height": 1.35
+      },
+      "body": {
+        "x": 1.05,
+        "y": 4.8,
+        "width": 9.8,
+        "height": 1.15
+      },
+      "image": {
+        "x": 8,
+        "y": 1.55,
+        "width": 4.45,
+        "height": 4.8
+      }
+    },
+    "image": {
+      "eyebrow": {
+        "x": 1.05,
+        "y": 1.42,
+        "width": 10,
+        "height": 0.35
+      },
+      "title": {
+        "x": 1.05,
+        "y": 2,
+        "width": 6.1,
+        "height": 1.35
+      },
+      "body": {
+        "x": 1.05,
+        "y": 4.8,
+        "width": 5.9,
+        "height": 1.15
+      },
+      "image": {
+        "x": 7.45,
+        "y": 1.55,
+        "width": 4.95,
+        "height": 4.8
+      }
+    }
+  }
+}

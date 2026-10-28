@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://frame.local/schema/slide-deck.v3.json",
-  "title": "FRAME Slide Deck v3",
+  "$id": "https://frame.local/schema/slide-deck.v4.json",
+  "title": "FRAME Slide Deck v4",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -9,16 +9,42 @@
     "id",
     "title",
     "template",
+    "themeId",
+    "palette",
+    "paletteMapping",
     "masterElements",
     "canvas",
     "slides",
     "updatedAt"
   ],
   "properties": {
-    "schemaVersion": { "const": 3 },
+    "schemaVersion": { "const": 4 },
     "id": { "type": "string", "minLength": 1 },
     "title": { "type": "string" },
     "template": { "enum": ["paper", "ink", "signal"] },
+    "themeId": { "type": "string", "minLength": 1 },
+    "paletteId": { "type": "string" },
+    "palette": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["background", "main", "accent", "text"],
+      "properties": {
+        "background": { "$ref": "#/$defs/color" },
+        "main": { "$ref": "#/$defs/color" },
+        "accent": { "$ref": "#/$defs/color" },
+        "text": { "$ref": "#/$defs/color" }
+      }
+    },
+    "paletteMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["background", "main", "accent"],
+      "properties": {
+        "background": { "enum": ["base", "sub", "accent"] },
+        "main": { "enum": ["base", "sub", "accent"] },
+        "accent": { "enum": ["base", "sub", "accent"] }
+      }
+    },
     "masterElements": {
       "type": "array",
       "items": { "$ref": "#/$defs/element" }
@@ -41,6 +67,7 @@
     }
   },
   "$defs": {
+    "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
     "slide": {
       "type": "object",
       "additionalProperties": false,

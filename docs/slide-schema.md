@@ -1,4 +1,4 @@
-# Slide JSON schema (v3)
+# Slide JSON schema (v4)
 
 The canonical file is [`src/schema/slide-deck.schema.json`](../src/schema/slide-deck.schema.json). Import and export use the same `Deck` object. Import validates the JSON Schema before displaying or saving it. Every edit is stored in IndexedDB as this object.
 
@@ -10,15 +10,19 @@ For `pptxgenjs`, pass the geometry values directly to `slide.addText`, `slide.ad
 
 ## Root
 
-| Field            | Meaning                                                                     |
-| ---------------- | --------------------------------------------------------------------------- |
-| `schemaVersion`  | Required integer. Current value: `3`.                                       |
-| `id`, `title`    | Presentation identifier and display name.                                   |
-| `template`       | `paper`, `ink`, or `signal`. Applies the background and default text color. |
-| `canvas`         | Fixed wide-slide geometry above.                                            |
-| `slides`         | Non-empty ordered list of slides.                                           |
-| `masterElements` | Shared elements rendered behind each slide's contents.                      |
-| `updatedAt`      | ISO 8601 date-time string.                                                  |
+| Field            | Meaning                                                                               |
+| ---------------- | ------------------------------------------------------------------------------------- |
+| `schemaVersion`  | Required integer. Current value: `4`.                                                 |
+| `id`, `title`    | Presentation identifier and display name.                                             |
+| `template`       | Legacy template identifier (`paper`, `ink`, or `signal`); retained for compatibility. |
+| `themeId`        | ID of a theme JSON file or imported custom theme.                                     |
+| `palette`        | Effective HEX colors: `background`, `main`, `accent`, `text`.                         |
+| `paletteId`      | Optional selected MIRANOVA palette ID.                                                |
+| `paletteMapping` | Source color assignment for background/main/accent (`base`, `sub`, or `accent`).      |
+| `canvas`         | Fixed wide-slide geometry above.                                                      |
+| `slides`         | Non-empty ordered list of slides.                                                     |
+| `masterElements` | Shared elements rendered behind each slide's contents.                                |
+| `updatedAt`      | ISO 8601 date-time string.                                                            |
 
 Each slide has `id`, ordered `elements`, `hidden` (boolean), `showMaster` (boolean), and `notes` (array). Hidden slides remain editable and in JSON but are excluded from presentation and PDF output. `showMaster: false` suppresses shared master elements on that slide. Master elements are edited once in master-edit mode and appear on all slides with `showMaster: true`. All elements require `id`, `type`, `x`, `y`, `width`, `height`, and `style`.
 
@@ -36,10 +40,18 @@ Each note has `id`, `kind` (`revision`, `question`, or `memo`), non-empty `text`
 
 ```json
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "id": "demo-001",
   "title": "日本語スライド",
   "template": "paper",
+  "themeId": "business",
+  "palette": {
+    "background": "#F6F9FF",
+    "main": "#2454E8",
+    "accent": "#F7A23B",
+    "text": "#17233E"
+  },
+  "paletteMapping": { "background": "base", "main": "sub", "accent": "accent" },
   "masterElements": [],
   "canvas": { "width": 13.333, "height": 7.5, "unit": "in" },
   "updatedAt": "2026-10-27T00:00:00.000Z",
@@ -68,4 +80,4 @@ Each note has `id`, `kind` (`revision`, `question`, or `memo`), non-empty `text`
 
 ## Version migration
 
-`src/schema/validate.ts` contains `migrateDeck(input)`, the single version-dispatch entry point. It validates v3 documents; v2 gains shared `masterElements` and `showMaster: true` on each slide. v1 also gains `hidden: false` and `notes: []`. Unversioned MVP decks (`eyebrow`, `title`, `body`, `image`) migrate directly to v3. Unknown future versions fail clearly. The old LocalStorage key is read once for migration into IndexedDB; it remains as a backup.
+`src/schema/validate.ts` contains `migrateDeck(input)`, the single version-dispatch entry point. It validates v4 documents. v3 gains `themeId`, effective `palette`, and `paletteMapping`; v2 additionally gains shared `masterElements` and `showMaster: true` on each slide. v1 also gains `hidden: false` and `notes: []`. Unversioned MVP decks (`eyebrow`, `title`, `body`, `image`) migrate directly to v4. Unknown future versions fail clearly. The old LocalStorage key is read once for migration into IndexedDB; it remains as a backup.

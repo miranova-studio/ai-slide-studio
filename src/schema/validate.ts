@@ -4,6 +4,7 @@ import deckSchema from "./slide-deck.schema.json";
 import { SCHEMA_VERSION, SLIDE_HEIGHT, SLIDE_WIDTH } from "../types";
 import type { Deck, Slide } from "../types";
 import { makeMasterElements, makeSlide } from "../data/defaultDeck";
+import { DEFAULT_MAPPING, DEFAULT_PALETTE } from "../themes";
 
 const ajv = new Ajv2020({ allErrors: true });
 addFormats(ajv);
@@ -31,8 +32,9 @@ export function migrateDeck(input: unknown): Deck {
     throw new Error("JSONの形式が正しくありません");
   const version = (input as { schemaVersion?: unknown }).schemaVersion;
   if (version === SCHEMA_VERSION) return assertDeck(input);
-  if (version === 2) return assertDeck(migrateV2(input));
-  if (version === 1) return assertDeck(migrateV1(input));
+  if (version === 3) return assertDeck(migrateV3(input));
+  if (version === 2) return assertDeck(migrateV3(migrateV2(input)));
+  if (version === 1) return assertDeck(migrateV3(migrateV1(input)));
   if (version === undefined || version === 0)
     return assertDeck(migrateLegacy(input as LegacyDeck));
   throw new Error(`未対応のschemaVersion: ${String(version)}`);
@@ -57,9 +59,45 @@ function migrateV2(input: unknown): Deck {
   const old = input as Deck;
   return {
     ...old,
-    schemaVersion: SCHEMA_VERSION,
+    schemaVersion: 3,
     masterElements: makeMasterElements(old.template),
     slides: old.slides.map((slide) => ({ ...slide, showMaster: true })),
+  } as Deck;
+}
+
+function migrateV3(input: unknown): Deck {
+  const old = input as Deck;
+  const legacyPalettes = {
+    paper: {
+      background: "#F5F0E5",
+      main: "#DC6339",
+      accent: "#E15C30",
+      text: "#262521",
+    },
+    ink: {
+      background: "#151B24",
+      main: "#7EBCFF",
+      accent: "#8CC8FF",
+      text: "#F4F0E7",
+    },
+    signal: {
+      background: "#F4DB3D",
+      main: "#F05237",
+      accent: "#F05237",
+      text: "#161511",
+    },
+  };
+  return {
+    ...old,
+    schemaVersion: SCHEMA_VERSION,
+    themeId:
+      old.template === "ink"
+        ? "dark"
+        : old.template === "signal"
+          ? "pop"
+          : "business",
+    palette: legacyPalettes[old.template] || DEFAULT_PALETTE,
+    paletteMapping: DEFAULT_MAPPING,
   };
 }
 
@@ -93,6 +131,9 @@ function migrateLegacy(legacy: LegacyDeck): Deck {
     template: ["paper", "ink", "signal"].includes(legacy.template || "")
       ? legacy.template!
       : "paper",
+    themeId: "business",
+    palette: DEFAULT_PALETTE,
+    paletteMapping: DEFAULT_MAPPING,
     masterElements: makeMasterElements(
       ["paper", "ink", "signal"].includes(legacy.template || "")
         ? legacy.template!

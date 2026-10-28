@@ -6,6 +6,7 @@ import type {
   TemplateId,
   ShapeElement,
 } from "../types";
+import { DEFAULT_MAPPING, DEFAULT_PALETTE } from "../themes";
 
 export function makeMasterElements(template: TemplateId): ShapeElement[] {
   const variants = {
@@ -93,6 +94,9 @@ export const defaultDeck: Deck = {
   id: "welcome-deck",
   title: "言葉を、伝わる形へ。",
   template: "paper",
+  themeId: "business",
+  palette: DEFAULT_PALETTE,
+  paletteMapping: DEFAULT_MAPPING,
   masterElements: makeMasterElements("paper"),
   canvas: { width: SLIDE_WIDTH, height: SLIDE_HEIGHT, unit: "in" },
   updatedAt: new Date().toISOString(),

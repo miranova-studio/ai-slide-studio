@@ -9,6 +9,9 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --pretty false",
     "check:schema": "node scripts/check-schema.mjs",
+    "sync-palettes": "node scripts/sync-palettes.mjs",
+    "check:themes": "node scripts/check-themes.mjs",
+    "check:migrations": "node scripts/check-migrations.mjs",
     "format": "prettier --write src docs examples scripts *.json *.md *.ts *.html"
   },
   "dependencies": {
