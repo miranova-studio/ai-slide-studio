@@ -161,12 +161,6 @@ function SlideCanvas({
       className={`slide-canvas template-${template}`}
       style={{ background: palette.background, color: palette.text }}
     >
-      <div className="slide-chrome" style={{ color: palette.main }}>
-        <span>FRAME</span>
-        <span className="slide-count-mark" style={{ color: palette.accent }}>
-          ●
-        </span>
-      </div>
       {[
         ...(slide.showMaster || masterMode
           ? masterElements.map((element) => ({ element, master: true }))

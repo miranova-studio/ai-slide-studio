@@ -274,42 +274,17 @@ main {
   isolation: isolate;
   container-type: inline-size;
 }
-.slide-chrome {
-  position: absolute;
-  top: 5.3%;
-  left: 5%;
-  right: 5%;
-  display: flex;
-  justify-content: space-between;
-  z-index: 2;
-  font-size: 1.3cqw;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-}
-.accent-shape {
-  position: absolute;
-  z-index: 0;
-}
 .template-paper {
   color: #262521;
   background: #f5f0e5;
-}
-.template-paper .slide-count-mark {
-  color: #e15c30;
 }
 .template-ink {
   color: #f4f0e7;
   background: #151b24;
 }
-.template-ink .slide-count-mark {
-  color: #8cc8ff;
-}
 .template-signal {
   color: #161511;
   background: #f4db3d;
-}
-.accent-shape {
-  display: none;
 }
 .master-menu-button {
   background: var(--ui-primary-soft);
@@ -375,9 +350,6 @@ main {
 }
 .stroke-width-field input[type="number"] {
   width: 64px;
-}
-.template-signal .slide-count-mark {
-  color: #f05237;
 }
 .panel-section {
   padding: 20px 17px;
