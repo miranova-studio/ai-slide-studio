@@ -32,6 +32,7 @@ import {
   saveCustomTheme,
 } from "./services/storage";
 import { ThemePanel } from "./components/ThemePanel";
+import { CourseOutline } from "./components/CourseOutline";
 import miranovaPalettes from "./data/miranova-palettes.json";
 import {
   assertTheme,
@@ -49,7 +50,17 @@ import type {
   PaletteMapping,
 } from "./themes";
 import { SLIDE_HEIGHT, SLIDE_WIDTH } from "./types";
+import {
+  courseDuration,
+  courseSlides,
+  formatDuration,
+  lectureDuration,
+  lectureForSlide,
+  makeCourse,
+  slideDuration,
+} from "./course";
 import type {
+  CourseData,
   Deck,
   NoteKind,
   Slide,
@@ -62,7 +73,7 @@ import "./styles.css";
 
 type ViewMode = "slide" | "grid" | "scroll";
 type RailTab = "outline" | "thumbnails";
-type PanelTab = "edit" | "notes" | "theme";
+type PanelTab = "edit" | "notes" | "theme" | "narration";
 type ResizeCorner = "nw" | "ne" | "sw" | "se";
 type GestureMode = "move" | ResizeCorner;
 const shapeLabels: { value: ShapeElement["shape"]; label: string }[] = [
@@ -354,6 +365,7 @@ export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>("slide");
   const [railTab, setRailTab] = useState<RailTab>("thumbnails");
   const [panelTab, setPanelTab] = useState<PanelTab>("edit");
+  const [courseInfoOpen, setCourseInfoOpen] = useState(false);
   const [noteKind, setNoteKind] = useState<NoteKind>("revision");
   const [noteText, setNoteText] = useState("");
   const [toast, setToast] = useState("");
@@ -365,7 +377,15 @@ export default function App() {
     deck.slides.findIndex((slide) => slide.id === activeId),
   );
   const activeSlide = deck.slides[activeIndex];
-  const visibleSlides = deck.slides.filter((slide) => !slide.hidden);
+  const orderedSlides = courseSlides(deck);
+  const activePosition = Math.max(
+    0,
+    orderedSlides.findIndex((slide) => slide.id === activeId),
+  );
+  const visibleSlides = orderedSlides.filter((slide) => !slide.hidden);
+  const currentLecture = deck.course
+    ? lectureForSlide(deck.course, activeId)
+    : undefined;
   const selected = (
     masterMode ? deck.masterElements : activeSlide?.elements
   )?.find((element) => element.id === selectedId);
@@ -479,6 +499,158 @@ export default function App() {
     pushHistory(before);
     showDeck({ ...next, updatedAt: new Date().toISOString() });
   }
+  function changeCourse(update: (course: CourseData) => CourseData) {
+    changeDeck((current) =>
+      current.course ? { ...current, course: update(current.course) } : current,
+    );
+  }
+  function switchMode(mode: Deck["mode"]) {
+    changeDeck((current) => ({
+      ...current,
+      mode,
+      course:
+        mode === "course"
+          ? current.course || makeCourse(current.slides)
+          : current.course,
+    }));
+    setCourseInfoOpen(mode === "course");
+    setPanelTab("edit");
+    setMasterMode(false);
+  }
+  function addCourseSection() {
+    const slide = layoutSlide(makeSlide(), activeTheme, "title");
+    changeDeck((current) => ({
+      ...current,
+      slides: [...current.slides, slide],
+      course: {
+        ...current.course!,
+        sections: [
+          ...current.course!.sections,
+          {
+            id: crypto.randomUUID(),
+            title: `セクション ${current.course!.sections.length + 1}`,
+            lectures: [
+              {
+                id: crypto.randomUUID(),
+                title: "レクチャー 1",
+                slideIds: [slide.id],
+              },
+            ],
+          },
+        ],
+      },
+    }));
+    selectSlide(slide.id);
+    setCourseInfoOpen(false);
+  }
+  function addCourseLecture(sectionId: string) {
+    const slide = layoutSlide(makeSlide(), activeTheme, "body");
+    changeDeck((current) => ({
+      ...current,
+      slides: [...current.slides, slide],
+      course: {
+        ...current.course!,
+        sections: current.course!.sections.map((section) =>
+          section.id === sectionId
+            ? {
+                ...section,
+                lectures: [
+                  ...section.lectures,
+                  {
+                    id: crypto.randomUUID(),
+                    title: `レクチャー ${section.lectures.length + 1}`,
+                    slideIds: [slide.id],
+                  },
+                ],
+              }
+            : section,
+        ),
+      },
+    }));
+    selectSlide(slide.id);
+    setCourseInfoOpen(false);
+  }
+  function deleteCourseSection(sectionId: string) {
+    if (!deck.course || deck.course.sections.length <= 1)
+      return notify("最後のセクションは削除できません");
+    const removed = new Set(
+      deck.course.sections
+        .find((section) => section.id === sectionId)
+        ?.lectures.flatMap((lecture) => lecture.slideIds),
+    );
+    if (removed.size >= deck.slides.length)
+      return notify("最後のスライドは削除できません");
+    changeDeck((current) => ({
+      ...current,
+      slides: current.slides.filter((slide) => !removed.has(slide.id)),
+      course: {
+        ...current.course!,
+        sections: current.course!.sections.filter(
+          (section) => section.id !== sectionId,
+        ),
+      },
+    }));
+    if (removed.has(activeId))
+      selectSlide(deck.slides.find((slide) => !removed.has(slide.id))!.id);
+  }
+  function deleteCourseLecture(lectureId: string) {
+    if (!deck.course) return;
+    const all = deck.course.sections.flatMap((section) => section.lectures);
+    if (all.length <= 1) return notify("最後のレクチャーは削除できません");
+    const removed = new Set(
+      all.find((lecture) => lecture.id === lectureId)?.slideIds,
+    );
+    if (removed.size >= deck.slides.length)
+      return notify("最後のスライドを含むレクチャーは削除できません");
+    changeDeck((current) => ({
+      ...current,
+      slides: current.slides.filter((slide) => !removed.has(slide.id)),
+      course: {
+        ...current.course!,
+        sections: current.course!.sections.map((section) => ({
+          ...section,
+          lectures: section.lectures.filter(
+            (lecture) => lecture.id !== lectureId,
+          ),
+        })),
+      },
+    }));
+    if (removed.has(activeId))
+      selectSlide(deck.slides.find((slide) => !removed.has(slide.id))!.id);
+  }
+  function reorderCourseItem(
+    kind: "section" | "lecture",
+    sourceId: string,
+    targetId: string,
+  ) {
+    if (sourceId === targetId) return;
+    changeCourse((course) => {
+      const sections = structuredClone(course.sections);
+      if (kind === "section") {
+        const from = sections.findIndex((section) => section.id === sourceId);
+        const to = sections.findIndex((section) => section.id === targetId);
+        if (from < 0 || to < 0) return course;
+        sections.splice(to, 0, sections.splice(from, 1)[0]);
+      } else {
+        const fromSection = sections.find((section) =>
+          section.lectures.some((lecture) => lecture.id === sourceId),
+        );
+        const toSection = sections.find((section) =>
+          section.lectures.some((lecture) => lecture.id === targetId),
+        );
+        if (!fromSection || !toSection) return course;
+        const targetIndex = toSection.lectures.findIndex(
+          (lecture) => lecture.id === targetId,
+        );
+        const moved = fromSection.lectures.splice(
+          fromSection.lectures.findIndex((lecture) => lecture.id === sourceId),
+          1,
+        )[0];
+        toSection.lectures.splice(targetIndex, 0, moved);
+      }
+      return { ...course, sections };
+    });
+  }
   function restoreDeck(next: Deck) {
     showDeck(next);
     setActiveId((current) =>
@@ -544,26 +716,81 @@ export default function App() {
     changeDeck((current) => {
       const slides = [...current.slides];
       slides.splice(activeIndex + 1, 0, next);
-      return { ...current, slides };
+      const course =
+        current.mode === "course" && current.course
+          ? {
+              ...current.course,
+              sections: current.course.sections.map((section) => ({
+                ...section,
+                lectures: section.lectures.map((lecture) => {
+                  if (lecture.id !== currentLecture?.id) return lecture;
+                  const ids = [...lecture.slideIds];
+                  ids.splice(
+                    Math.max(0, ids.indexOf(activeId) + 1),
+                    0,
+                    next.id,
+                  );
+                  return { ...lecture, slideIds: ids };
+                }),
+              })),
+            }
+          : current.course;
+      return { ...current, slides, course };
     });
     setActiveId(next.id);
     setSelectedId(undefined);
   }
   function deleteSlide(id: string) {
     if (deck.slides.length === 1) return notify("最後の1枚は削除できません");
+    if (
+      deck.mode === "course" &&
+      deck.course &&
+      lectureForSlide(deck.course, id)?.slideIds.length === 1
+    )
+      return notify("レクチャーには1枚以上のスライドが必要です");
     const index = deck.slides.findIndex((slide) => slide.id === id);
     const slides = deck.slides.filter((slide) => slide.id !== id);
-    changeDeck((current) => ({ ...current, slides }));
+    changeDeck((current) => ({
+      ...current,
+      slides,
+      course: current.course
+        ? {
+            ...current.course,
+            sections: current.course.sections.map((section) => ({
+              ...section,
+              lectures: section.lectures.map((lecture) => ({
+                ...lecture,
+                slideIds: lecture.slideIds.filter((slideId) => slideId !== id),
+              })),
+            })),
+          }
+        : undefined,
+    }));
     if (id === activeId) {
       setActiveId(slides[Math.min(index, slides.length - 1)].id);
       setSelectedId(undefined);
     }
   }
-  function reorder(targetId: string) {
-    if (!draggedId || draggedId === targetId) return;
+  function reorder(targetId: string, sourceId = draggedId) {
+    if (!sourceId || sourceId === targetId) return;
     changeDeck((current) => {
+      if (current.mode === "course" && current.course) {
+        const sections = structuredClone(current.course.sections);
+        const from = sections
+          .flatMap((section) => section.lectures)
+          .find((lecture) => lecture.slideIds.includes(sourceId));
+        const to = sections
+          .flatMap((section) => section.lectures)
+          .find((lecture) => lecture.slideIds.includes(targetId));
+        if (!from || !to) return current;
+        if (from !== to && from.slideIds.length === 1) return current;
+        const targetIndex = to.slideIds.indexOf(targetId);
+        from.slideIds.splice(from.slideIds.indexOf(sourceId), 1);
+        to.slideIds.splice(targetIndex, 0, sourceId);
+        return { ...current, course: { ...current.course, sections } };
+      }
       const slides = [...current.slides];
-      const from = slides.findIndex((slide) => slide.id === draggedId);
+      const from = slides.findIndex((slide) => slide.id === sourceId);
       const to = slides.findIndex((slide) => slide.id === targetId);
       if (from < 0 || to < 0) return current;
       const [moved] = slides.splice(from, 1);
@@ -583,6 +810,8 @@ export default function App() {
   }
   function selectSlide(id: string) {
     setActiveId(id);
+    setCourseInfoOpen(false);
+    setViewMode("slide");
     setSelectedId(undefined);
     setEditingTextId(undefined);
   }
@@ -664,6 +893,7 @@ export default function App() {
       setActiveId(imported.slides[0].id);
       setSelectedId(undefined);
       setEditingTextId(undefined);
+      setCourseInfoOpen(false);
       notify(`${imported.slides.length}枚をインポートしました`);
     } catch (error) {
       notify(
@@ -819,14 +1049,38 @@ export default function App() {
         index === 0 ? "title" : "body",
       );
     });
-    changeDeck((current) => ({
-      ...current,
-      title:
-        slides[0].elements[1].type === "text"
-          ? slides[0].elements[1].text
-          : current.title,
-      slides,
-    }));
+    changeDeck((current) => {
+      if (current.mode === "course" && current.course && currentLecture)
+        return {
+          ...current,
+          slides: [...current.slides, ...slides],
+          course: {
+            ...current.course,
+            sections: current.course.sections.map((section) => ({
+              ...section,
+              lectures: section.lectures.map((lecture) =>
+                lecture.id === currentLecture.id
+                  ? {
+                      ...lecture,
+                      slideIds: [
+                        ...lecture.slideIds,
+                        ...slides.map((slide) => slide.id),
+                      ],
+                    }
+                  : lecture,
+              ),
+            })),
+          },
+        };
+      return {
+        ...current,
+        title:
+          slides[0].elements[1].type === "text"
+            ? slides[0].elements[1].text
+            : current.title,
+        slides,
+      };
+    });
     setActiveId(slides[0].id);
     setSelectedId(undefined);
     setScriptOpen(false);
@@ -1054,6 +1308,20 @@ export default function App() {
             </span>
           </div>
           <div className="header-actions">
+            <div className="mode-switch" role="group" aria-label="制作モード">
+              <button
+                className={deck.mode === "deck" ? "active" : ""}
+                onClick={() => switchMode("deck")}
+              >
+                スライドモード
+              </button>
+              <button
+                className={deck.mode === "course" ? "active" : ""}
+                onClick={() => switchMode("course")}
+              >
+                講座モード
+              </button>
+            </div>
             <button
               className={
                 masterMode ? "master-menu-button active" : "master-menu-button"
@@ -1114,261 +1382,420 @@ export default function App() {
         </header>
         <main>
           <aside className="slide-rail">
-            <div className="rail-heading">
-              <span>スライド一覧</span>
-              <button onClick={addSlide} title="スライドを追加">
-                <Plus size={17} />
-              </button>
-            </div>
-            <div
-              className="panel-tabs rail-tabs"
-              role="tablist"
-              aria-label="左パネルの表示"
-            >
-              <button
-                role="tab"
-                aria-selected={railTab === "outline"}
-                className={railTab === "outline" ? "active" : ""}
-                onClick={() => setRailTab("outline")}
-              >
-                <ListOrdered size={14} />
-                目次
-              </button>
-              <button
-                role="tab"
-                aria-selected={railTab === "thumbnails"}
-                className={railTab === "thumbnails" ? "active" : ""}
-                onClick={() => setRailTab("thumbnails")}
-              >
-                <LayoutGrid size={14} />
-                サムネイル
-              </button>
-            </div>
-            {railTab === "outline" ? (
-              <div className="outline-list">
-                {deck.slides.map((slide, index) => (
-                  <button
-                    key={slide.id}
-                    className={`outline-item ${slide.id === activeId ? "active" : ""} ${slide.hidden ? "is-hidden" : ""}`}
-                    onClick={() => {
-                      selectSlide(slide.id);
-                      setViewMode("slide");
-                    }}
-                  >
-                    <span>{String(index + 1).padStart(2, "0")}</span>
-                    <strong>{slideTitle(slide, index)}</strong>
-                    {slide.hidden && <EyeOff size={13} aria-label="非表示" />}
-                  </button>
-                ))}
-              </div>
+            {deck.mode === "course" && deck.course ? (
+              <CourseOutline
+                deck={deck}
+                activeId={activeId}
+                onInfo={() => {
+                  setCourseInfoOpen(true);
+                  setMasterMode(false);
+                }}
+                onSelect={selectSlide}
+                onAddSection={addCourseSection}
+                onAddLecture={addCourseLecture}
+                onAddSlide={addSlide}
+                onRenameSection={(id, title) =>
+                  changeCourse((course) => ({
+                    ...course,
+                    sections: course.sections.map((section) =>
+                      section.id === id ? { ...section, title } : section,
+                    ),
+                  }))
+                }
+                onRenameLecture={(id, title) =>
+                  changeCourse((course) => ({
+                    ...course,
+                    sections: course.sections.map((section) => ({
+                      ...section,
+                      lectures: section.lectures.map((lecture) =>
+                        lecture.id === id ? { ...lecture, title } : lecture,
+                      ),
+                    })),
+                  }))
+                }
+                onDeleteSection={deleteCourseSection}
+                onDeleteLecture={deleteCourseLecture}
+                onMove={(kind, sourceId, targetId) => {
+                  if (kind === "slide") reorder(targetId, sourceId);
+                  else reorderCourseItem(kind, sourceId, targetId);
+                }}
+              />
             ) : (
-              <div className="thumbnails">
-                {deck.slides.map((slide, index) => (
-                  <div
-                    className={`thumb-row ${slide.id === activeId ? "active" : ""} ${slide.hidden ? "is-hidden" : ""}`}
-                    key={slide.id}
-                    draggable
-                    onContextMenu={(event) => {
-                      event.preventDefault();
-                      selectSlide(slide.id);
-                      setThumbnailMenu({
-                        slideId: slide.id,
-                        x: event.clientX,
-                        y: event.clientY,
-                      });
-                    }}
-                    onDragStart={() => setDraggedId(slide.id)}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={() => reorder(slide.id)}
+              <>
+                <div className="rail-heading">
+                  <span>スライド一覧</span>
+                  <button onClick={addSlide} title="スライドを追加">
+                    <Plus size={17} />
+                  </button>
+                </div>
+                <div
+                  className="panel-tabs rail-tabs"
+                  role="tablist"
+                  aria-label="左パネルの表示"
+                >
+                  <button
+                    role="tab"
+                    aria-selected={railTab === "outline"}
+                    className={railTab === "outline" ? "active" : ""}
+                    onClick={() => setRailTab("outline")}
                   >
-                    <span className="thumb-number">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                    <button
-                      className="thumb"
-                      onClick={() => {
-                        selectSlide(slide.id);
-                        setViewMode("slide");
-                      }}
-                    >
-                      <SlideCanvas
-                        slide={slide}
-                        template={deck.template}
-                        palette={deck.palette}
-                        fonts={activeTheme.fonts}
-                        masterElements={deck.masterElements}
-                      />
-                    </button>
-                    <button
-                      className="thumb-delete"
-                      onClick={() => deleteSlide(slide.id)}
-                      aria-label={`${index + 1}枚目を削除`}
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                    {slide.hidden && (
-                      <EyeOff
-                        className="thumb-hidden-icon"
-                        size={14}
-                        aria-label="非表示"
-                      />
-                    )}
+                    <ListOrdered size={14} />
+                    目次
+                  </button>
+                  <button
+                    role="tab"
+                    aria-selected={railTab === "thumbnails"}
+                    className={railTab === "thumbnails" ? "active" : ""}
+                    onClick={() => setRailTab("thumbnails")}
+                  >
+                    <LayoutGrid size={14} />
+                    サムネイル
+                  </button>
+                </div>
+                {railTab === "outline" ? (
+                  <div className="outline-list">
+                    {deck.slides.map((slide, index) => (
+                      <button
+                        key={slide.id}
+                        className={`outline-item ${slide.id === activeId ? "active" : ""} ${slide.hidden ? "is-hidden" : ""}`}
+                        onClick={() => {
+                          selectSlide(slide.id);
+                          setViewMode("slide");
+                        }}
+                      >
+                        <span>{String(index + 1).padStart(2, "0")}</span>
+                        <strong>{slideTitle(slide, index)}</strong>
+                        {slide.hidden && (
+                          <EyeOff size={13} aria-label="非表示" />
+                        )}
+                      </button>
+                    ))}
                   </div>
-                ))}
-              </div>
+                ) : (
+                  <div className="thumbnails">
+                    {deck.slides.map((slide, index) => (
+                      <div
+                        className={`thumb-row ${slide.id === activeId ? "active" : ""} ${slide.hidden ? "is-hidden" : ""}`}
+                        key={slide.id}
+                        draggable
+                        onContextMenu={(event) => {
+                          event.preventDefault();
+                          selectSlide(slide.id);
+                          setThumbnailMenu({
+                            slideId: slide.id,
+                            x: event.clientX,
+                            y: event.clientY,
+                          });
+                        }}
+                        onDragStart={() => setDraggedId(slide.id)}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={() => reorder(slide.id)}
+                      >
+                        <span className="thumb-number">
+                          {String(index + 1).padStart(2, "0")}
+                        </span>
+                        <button
+                          className="thumb"
+                          onClick={() => {
+                            selectSlide(slide.id);
+                            setViewMode("slide");
+                          }}
+                        >
+                          <SlideCanvas
+                            slide={slide}
+                            template={deck.template}
+                            palette={deck.palette}
+                            fonts={activeTheme.fonts}
+                            masterElements={deck.masterElements}
+                          />
+                        </button>
+                        <button
+                          className="thumb-delete"
+                          onClick={() => deleteSlide(slide.id)}
+                          aria-label={`${index + 1}枚目を削除`}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                        {slide.hidden && (
+                          <EyeOff
+                            className="thumb-hidden-icon"
+                            size={14}
+                            aria-label="非表示"
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button className="add-slide" onClick={addSlide}>
+                  <Plus size={16} />
+                  スライドを追加
+                </button>
+              </>
             )}
-            <button className="add-slide" onClick={addSlide}>
-              <Plus size={16} />
-              スライドを追加
-            </button>
           </aside>
           <section className="workspace">
-            {masterMode && (
-              <div className="master-mode-banner" role="status">
-                <div>
-                  <strong>マスター編集中</strong>
-                  <span>
-                    柄をクリックして色・位置を編集。変更は全スライドに反映されます。
-                  </span>
+            {courseInfoOpen && deck.mode === "course" && deck.course ? (
+              <div className="course-info-screen">
+                <div className="course-info-head">
+                  <h2>講座情報</h2>
+                  <button onClick={() => setCourseInfoOpen(false)}>
+                    スライド編集へ戻る
+                  </button>
                 </div>
-                <button
-                  onClick={() => {
-                    setMasterMode(false);
-                    setSelectedId(undefined);
-                    setEditingTextId(undefined);
-                  }}
-                >
-                  通常編集に戻る
-                </button>
-              </div>
-            )}
-            <div className="workspace-bar">
-              <span>{masterMode ? "マスターの柄を編集" : "スライド編集"}</span>
-              <div
-                className="view-switch"
-                role="tablist"
-                aria-label="スライドの表示形式"
-              >
-                <button
-                  role="tab"
-                  aria-selected={viewMode === "slide"}
-                  className={viewMode === "slide" ? "active" : ""}
-                  onClick={() => setViewMode("slide")}
-                >
-                  スライド
-                </button>
-                <button
-                  role="tab"
-                  aria-selected={viewMode === "grid"}
-                  className={viewMode === "grid" ? "active" : ""}
-                  disabled={masterMode}
-                  onClick={() => setViewMode("grid")}
-                >
-                  一覧
-                </button>
-                <button
-                  role="tab"
-                  aria-selected={viewMode === "scroll"}
-                  className={viewMode === "scroll" ? "active" : ""}
-                  disabled={masterMode}
-                  onClick={() => setViewMode("scroll")}
-                >
-                  スクロール
-                </button>
-              </div>
-              <span>
-                {activeIndex + 1} / {deck.slides.length}
-              </span>
-            </div>
-            {viewMode === "slide" ? (
-              <div
-                className={`canvas-wrap ${activeSlide.hidden && !masterMode ? "is-hidden" : ""}`}
-              >
-                <SlideCanvas
-                  slide={activeSlide}
-                  masterElements={deck.masterElements}
-                  masterMode={masterMode}
-                  template={deck.template}
-                  palette={deck.palette}
-                  fonts={activeTheme.fonts}
-                  editable
-                  selectedId={selectedId}
-                  editingTextId={editingTextId}
-                  onSelect={setSelectedId}
-                  onStartTextEdit={(id) => {
-                    setSelectedId(id);
-                    setEditingTextId(id);
-                  }}
-                  onEndTextEdit={() => setEditingTextId(undefined)}
-                  onTextChange={(id, text) => {
-                    const current = (
-                      masterMode
-                        ? deckRef.current.masterElements
-                        : deckRef.current.slides.find(
-                            (slide) => slide.id === activeId,
-                          )?.elements
-                    )?.find((element) => element.id === id);
-                    if (current?.type === "text" && current.text !== text)
-                      updateElement(id, { text } as Partial<TextElement>);
-                  }}
-                  onGestureStart={startGesture}
-                  onGestureMove={moveGesture}
-                  onGestureEnd={endGesture}
-                />
+                <label>
+                  講座タイトル
+                  <input
+                    aria-label="講座タイトル"
+                    value={deck.title}
+                    onChange={(event) =>
+                      changeDeck((current) => ({
+                        ...current,
+                        title: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label>
+                  サブタイトル
+                  <input
+                    aria-label="サブタイトル"
+                    value={deck.course.subtitle}
+                    onChange={(event) =>
+                      changeCourse((course) => ({
+                        ...course,
+                        subtitle: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label>
+                  対象者
+                  <textarea
+                    aria-label="対象者"
+                    value={deck.course.audience}
+                    onChange={(event) =>
+                      changeCourse((course) => ({
+                        ...course,
+                        audience: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label>
+                  学習目標（1行に1件）
+                  <textarea
+                    aria-label="学習目標"
+                    value={deck.course.objectives.join("\n")}
+                    onChange={(event) =>
+                      changeCourse((course) => ({
+                        ...course,
+                        objectives: event.target.value.split("\n"),
+                      }))
+                    }
+                  />
+                </label>
+                <label>
+                  前提知識（1行に1件）
+                  <textarea
+                    aria-label="前提知識"
+                    value={deck.course.prerequisites.join("\n")}
+                    onChange={(event) =>
+                      changeCourse((course) => ({
+                        ...course,
+                        prerequisites: event.target.value.split("\n"),
+                      }))
+                    }
+                  />
+                </label>
+                <label>
+                  講座説明文
+                  <textarea
+                    aria-label="講座説明文"
+                    value={deck.course.description}
+                    onChange={(event) =>
+                      changeCourse((course) => ({
+                        ...course,
+                        description: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label>
+                  話す速さ（日本語の字数／分）
+                  <input
+                    aria-label="日本語の字数／分"
+                    type="number"
+                    min="1"
+                    value={deck.course.charactersPerMinute}
+                    onChange={(event) =>
+                      changeCourse((course) => ({
+                        ...course,
+                        charactersPerMinute: Math.max(
+                          1,
+                          Number(event.target.value) || 1,
+                        ),
+                      }))
+                    }
+                  />
+                </label>
+                <p>
+                  制作時間の目安：{formatDuration(courseDuration(deck))}
+                  。Udemyの動画時間とは異なります。
+                </p>
               </div>
             ) : (
-              <div
-                className={`multi-slide-view ${viewMode === "grid" ? "grid-view" : "scroll-view"}`}
-              >
-                {deck.slides.map((slide, index) => (
-                  <div
-                    key={slide.id}
-                    className={`multi-slide-item ${slide.id === activeId ? "active" : ""} ${slide.hidden ? "is-hidden" : ""}`}
-                    draggable={viewMode === "grid"}
-                    onDragStart={() => setDraggedId(slide.id)}
-                    onDragEnd={() => setDraggedId(null)}
-                    onDragOver={(event) => {
-                      if (viewMode === "grid") event.preventDefault();
-                    }}
-                    onDrop={() => {
-                      if (viewMode === "grid") reorder(slide.id);
-                    }}
-                  >
-                    <button
-                      className="multi-slide-heading"
-                      onClick={() => selectSlide(slide.id)}
-                    >
+              <>
+                {masterMode && (
+                  <div className="master-mode-banner" role="status">
+                    <div>
+                      <strong>マスター編集中</strong>
                       <span>
-                        {String(index + 1).padStart(2, "0")} ·{" "}
-                        {slideTitle(slide, index)}
+                        柄をクリックして色・位置を編集。変更は全スライドに反映されます。
                       </span>
-                      {slide.hidden && <span>非表示</span>}
-                    </button>
+                    </div>
                     <button
-                      className="multi-slide-preview"
                       onClick={() => {
-                        selectSlide(slide.id);
-                        if (viewMode === "grid") setViewMode("slide");
+                        setMasterMode(false);
+                        setSelectedId(undefined);
+                        setEditingTextId(undefined);
                       }}
                     >
-                      <SlideCanvas
-                        slide={slide}
-                        template={deck.template}
-                        palette={deck.palette}
-                        fonts={activeTheme.fonts}
-                        masterElements={deck.masterElements}
-                      />
+                      通常編集に戻る
                     </button>
                   </div>
-                ))}
-              </div>
-            )}
-            {viewMode === "slide" && (
-              <p className="edit-hint">
-                {activeSlide.hidden
-                  ? "このスライドは発表・PDFから除外されます"
-                  : "要素をドラッグで移動・四隅でサイズ変更 · テキストはダブルクリックで編集"}
-              </p>
+                )}
+                <div className="workspace-bar">
+                  <span>
+                    {masterMode ? "マスターの柄を編集" : "スライド編集"}
+                  </span>
+                  <div
+                    className="view-switch"
+                    role="tablist"
+                    aria-label="スライドの表示形式"
+                  >
+                    <button
+                      role="tab"
+                      aria-selected={viewMode === "slide"}
+                      className={viewMode === "slide" ? "active" : ""}
+                      onClick={() => setViewMode("slide")}
+                    >
+                      スライド
+                    </button>
+                    <button
+                      role="tab"
+                      aria-selected={viewMode === "grid"}
+                      className={viewMode === "grid" ? "active" : ""}
+                      disabled={masterMode}
+                      onClick={() => setViewMode("grid")}
+                    >
+                      一覧
+                    </button>
+                    <button
+                      role="tab"
+                      aria-selected={viewMode === "scroll"}
+                      className={viewMode === "scroll" ? "active" : ""}
+                      disabled={masterMode}
+                      onClick={() => setViewMode("scroll")}
+                    >
+                      スクロール
+                    </button>
+                  </div>
+                  <span>
+                    {activePosition + 1} / {orderedSlides.length}
+                  </span>
+                </div>
+                {viewMode === "slide" ? (
+                  <div
+                    className={`canvas-wrap ${activeSlide.hidden && !masterMode ? "is-hidden" : ""}`}
+                  >
+                    <SlideCanvas
+                      slide={activeSlide}
+                      masterElements={deck.masterElements}
+                      masterMode={masterMode}
+                      template={deck.template}
+                      palette={deck.palette}
+                      fonts={activeTheme.fonts}
+                      editable
+                      selectedId={selectedId}
+                      editingTextId={editingTextId}
+                      onSelect={setSelectedId}
+                      onStartTextEdit={(id) => {
+                        setSelectedId(id);
+                        setEditingTextId(id);
+                      }}
+                      onEndTextEdit={() => setEditingTextId(undefined)}
+                      onTextChange={(id, text) => {
+                        const current = (
+                          masterMode
+                            ? deckRef.current.masterElements
+                            : deckRef.current.slides.find(
+                                (slide) => slide.id === activeId,
+                              )?.elements
+                        )?.find((element) => element.id === id);
+                        if (current?.type === "text" && current.text !== text)
+                          updateElement(id, { text } as Partial<TextElement>);
+                      }}
+                      onGestureStart={startGesture}
+                      onGestureMove={moveGesture}
+                      onGestureEnd={endGesture}
+                    />
+                  </div>
+                ) : (
+                  <div
+                    className={`multi-slide-view ${viewMode === "grid" ? "grid-view" : "scroll-view"}`}
+                  >
+                    {orderedSlides.map((slide, index) => (
+                      <div
+                        key={slide.id}
+                        className={`multi-slide-item ${slide.id === activeId ? "active" : ""} ${slide.hidden ? "is-hidden" : ""}`}
+                        draggable={viewMode === "grid"}
+                        onDragStart={() => setDraggedId(slide.id)}
+                        onDragEnd={() => setDraggedId(null)}
+                        onDragOver={(event) => {
+                          if (viewMode === "grid") event.preventDefault();
+                        }}
+                        onDrop={() => {
+                          if (viewMode === "grid") reorder(slide.id);
+                        }}
+                      >
+                        <button
+                          className="multi-slide-heading"
+                          onClick={() => selectSlide(slide.id)}
+                        >
+                          <span>
+                            {String(index + 1).padStart(2, "0")} ·{" "}
+                            {slideTitle(slide, index)}
+                          </span>
+                          {slide.hidden && <span>非表示</span>}
+                        </button>
+                        <button
+                          className="multi-slide-preview"
+                          onClick={() => {
+                            selectSlide(slide.id);
+                            if (viewMode === "grid") setViewMode("slide");
+                          }}
+                        >
+                          <SlideCanvas
+                            slide={slide}
+                            template={deck.template}
+                            palette={deck.palette}
+                            fonts={activeTheme.fonts}
+                            masterElements={deck.masterElements}
+                          />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {viewMode === "slide" && (
+                  <p className="edit-hint">
+                    {activeSlide.hidden
+                      ? "このスライドは発表・PDFから除外されます"
+                      : "要素をドラッグで移動・四隅でサイズ変更 · テキストはダブルクリックで編集"}
+                  </p>
+                )}
+              </>
             )}
           </section>
           <aside className="properties">
@@ -1401,6 +1828,16 @@ export default function App() {
               >
                 テーマ
               </button>
+              {deck.mode === "course" && (
+                <button
+                  role="tab"
+                  aria-selected={panelTab === "narration"}
+                  className={panelTab === "narration" ? "active" : ""}
+                  onClick={() => setPanelTab("narration")}
+                >
+                  台本
+                </button>
+              )}
             </div>
             {panelTab === "edit" ? (
               <>
@@ -1701,6 +2138,34 @@ export default function App() {
                 onSaveToFolder={(name) => saveTheme(name, true)}
                 notify={notify}
               />
+            ) : panelTab === "narration" && deck.course ? (
+              <div className="panel-section narration-panel">
+                <h3>ナレーション台本</h3>
+                <p className="panel-help">
+                  {currentLecture?.title || "レクチャー"} · このスライドの台本
+                </p>
+                <textarea
+                  aria-label="ナレーション台本"
+                  value={activeSlide.narration}
+                  onChange={(event) =>
+                    changeSlide((slide) => ({
+                      ...slide,
+                      narration: event.target.value,
+                    }))
+                  }
+                  placeholder="このスライドで話す内容を入力"
+                />
+                <p>
+                  {[...activeSlide.narration].length}字 · 話す時間の目安{" "}
+                  {formatDuration(
+                    slideDuration(activeSlide, deck.course.charactersPerMinute),
+                  )}
+                </p>
+                <p className="panel-help">
+                  {deck.course.charactersPerMinute}
+                  字/分。講座情報で変更できます。
+                </p>
+              </div>
             ) : (
               <div className="notes-panel">
                 <div className="panel-section">

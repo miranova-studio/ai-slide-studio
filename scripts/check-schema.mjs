@@ -10,11 +10,18 @@ const schema = JSON.parse(
 const sample = JSON.parse(
   fs.readFileSync(new URL("../examples/japanese-sample.json", import.meta.url)),
 );
+const courseSample = JSON.parse(
+  fs.readFileSync(
+    new URL("../docs/examples/course-sample.json", import.meta.url),
+  ),
+);
 const ajv = new Ajv2020({ allErrors: true });
 addFormats(ajv);
 const validate = ajv.compile(schema);
 if (!validate(sample))
   throw new Error(JSON.stringify(validate.errors, null, 2));
+if (!validate(courseSample))
+  throw new Error(`Course sample: ${JSON.stringify(validate.errors, null, 2)}`);
 for (const slide of sample.slides) {
   for (const element of slide.elements) {
     if (
@@ -25,4 +32,4 @@ for (const slide of sample.slides) {
     }
   }
 }
-console.log("Slide JSON Schema and Japanese sample: valid");
+console.log("Slide JSON Schema, Japanese sample, and course sample: valid");

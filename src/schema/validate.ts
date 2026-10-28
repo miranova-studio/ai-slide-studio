@@ -32,9 +32,10 @@ export function migrateDeck(input: unknown): Deck {
     throw new Error("JSONの形式が正しくありません");
   const version = (input as { schemaVersion?: unknown }).schemaVersion;
   if (version === SCHEMA_VERSION) return assertDeck(input);
-  if (version === 3) return assertDeck(migrateV3(input));
-  if (version === 2) return assertDeck(migrateV3(migrateV2(input)));
-  if (version === 1) return assertDeck(migrateV3(migrateV1(input)));
+  if (version === 4) return assertDeck(migrateV4(input));
+  if (version === 3) return assertDeck(migrateV4(migrateV3(input)));
+  if (version === 2) return assertDeck(migrateV4(migrateV3(migrateV2(input))));
+  if (version === 1) return assertDeck(migrateV4(migrateV3(migrateV1(input))));
   if (version === undefined || version === 0)
     return assertDeck(migrateLegacy(input as LegacyDeck));
   throw new Error(`未対応のschemaVersion: ${String(version)}`);
@@ -89,7 +90,7 @@ function migrateV3(input: unknown): Deck {
   };
   return {
     ...old,
-    schemaVersion: SCHEMA_VERSION,
+    schemaVersion: 4,
     themeId:
       old.template === "ink"
         ? "dark"
@@ -98,6 +99,16 @@ function migrateV3(input: unknown): Deck {
           : "business",
     palette: legacyPalettes[old.template] || DEFAULT_PALETTE,
     paletteMapping: DEFAULT_MAPPING,
+  };
+}
+
+function migrateV4(input: unknown): Deck {
+  const old = input as Deck;
+  return {
+    ...old,
+    schemaVersion: SCHEMA_VERSION,
+    mode: "deck",
+    slides: old.slides.map((slide) => ({ ...slide, narration: "" })),
   };
 }
 
@@ -126,6 +137,7 @@ function migrateLegacy(legacy: LegacyDeck): Deck {
   });
   return {
     schemaVersion: SCHEMA_VERSION,
+    mode: "deck",
     id: legacy.id || crypto.randomUUID(),
     title: legacy.title || "Imported deck",
     template: ["paper", "ink", "signal"].includes(legacy.template || "")
@@ -163,6 +175,18 @@ export function assertDeck(input: unknown): Deck {
         );
       }
     }
+  }
+  if (input.mode === "course") {
+    const referenced = input.course!.sections.flatMap((section) =>
+      section.lectures.flatMap((lecture) => lecture.slideIds),
+    );
+    const slideIds = input.slides.map((slide) => slide.id);
+    if (
+      referenced.length !== slideIds.length ||
+      new Set(referenced).size !== referenced.length ||
+      referenced.some((id) => !slideIds.includes(id))
+    )
+      throw new Error("講座の目次とスライドIDが一致しません");
   }
   return input;
 }

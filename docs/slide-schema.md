@@ -1,4 +1,4 @@
-# Slide JSON schema (v4)
+# Slide JSON schema (v5)
 
 The canonical file is [`src/schema/slide-deck.schema.json`](../src/schema/slide-deck.schema.json). Import and export use the same `Deck` object. Import validates the JSON Schema before displaying or saving it. Every edit is stored in IndexedDB as this object.
 
@@ -12,7 +12,8 @@ For `pptxgenjs`, pass the geometry values directly to `slide.addText`, `slide.ad
 
 | Field            | Meaning                                                                               |
 | ---------------- | ------------------------------------------------------------------------------------- |
-| `schemaVersion`  | Required integer. Current value: `4`.                                                 |
+| `schemaVersion`  | Required integer. Current value: `5`.                                                 |
+| `mode`           | `deck` or `course`; see [course-schema.md](course-schema.md) for course fields.       |
 | `id`, `title`    | Presentation identifier and display name.                                             |
 | `template`       | Legacy template identifier (`paper`, `ink`, or `signal`); retained for compatibility. |
 | `themeId`        | ID of a theme JSON file or imported custom theme.                                     |
@@ -24,7 +25,7 @@ For `pptxgenjs`, pass the geometry values directly to `slide.addText`, `slide.ad
 | `masterElements` | Shared elements rendered behind each slide's contents.                                |
 | `updatedAt`      | ISO 8601 date-time string.                                                            |
 
-Each slide has `id`, ordered `elements`, `hidden` (boolean), `showMaster` (boolean), and `notes` (array). Hidden slides remain editable and in JSON but are excluded from presentation and PDF output. `showMaster: false` suppresses shared master elements on that slide. Master elements are edited once in master-edit mode and appear on all slides with `showMaster: true`. All elements require `id`, `type`, `x`, `y`, `width`, `height`, and `style`.
+Each slide has `id`, ordered `elements`, `hidden` (boolean), `showMaster` (boolean), `notes` (array), and `narration` (string). Optional `audio` stores audio metadata; the binary resides in IndexedDB. Hidden slides remain editable and in JSON but are excluded from presentation and PDF output. `showMaster: false` suppresses shared master elements on that slide. Master elements are edited once in master-edit mode and appear on all slides with `showMaster: true`. All elements require `id`, `type`, `x`, `y`, `width`, `height`, and `style`.
 
 Each note has `id`, `kind` (`revision`, `question`, or `memo`), non-empty `text`, `completed` (boolean), and ISO 8601 `createdAt`. Notes are attached to a slide and are never printed.
 
@@ -40,7 +41,8 @@ Each note has `id`, `kind` (`revision`, `question`, or `memo`), non-empty `text`
 
 ```json
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
+  "mode": "deck",
   "id": "demo-001",
   "title": "日本語スライド",
   "template": "paper",
@@ -60,6 +62,7 @@ Each note has `id`, `kind` (`revision`, `question`, or `memo`), non-empty `text`
       "id": "slide-001",
       "hidden": false,
       "showMaster": true,
+      "narration": "",
       "notes": [],
       "elements": [
         {
@@ -80,4 +83,4 @@ Each note has `id`, `kind` (`revision`, `question`, or `memo`), non-empty `text`
 
 ## Version migration
 
-`src/schema/validate.ts` contains `migrateDeck(input)`, the single version-dispatch entry point. It validates v4 documents. v3 gains `themeId`, effective `palette`, and `paletteMapping`; v2 additionally gains shared `masterElements` and `showMaster: true` on each slide. v1 also gains `hidden: false` and `notes: []`. Unversioned MVP decks (`eyebrow`, `title`, `body`, `image`) migrate directly to v4. Unknown future versions fail clearly. The old LocalStorage key is read once for migration into IndexedDB; it remains as a backup.
+`src/schema/validate.ts` contains `migrateDeck(input)`, the single version-dispatch entry point. It validates v5 documents. v4 gains `mode: "deck"` and empty slide narration. v3 gains `themeId`, effective `palette`, and `paletteMapping`; v2 additionally gains shared `masterElements` and `showMaster: true` on each slide. v1 also gains `hidden: false` and `notes: []`. Unversioned MVP decks (`eyebrow`, `title`, `body`, `image`) migrate directly to v5. Unknown future versions fail clearly. The old LocalStorage key is read once for migration into IndexedDB; it remains as a backup.

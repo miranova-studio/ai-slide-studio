@@ -1,0 +1,164 @@
+{
+  "schemaVersion": 5,
+  "mode": "course",
+  "id": "sample-course",
+  "title": "はじめての伝わるスライド講座",
+  "template": "paper",
+  "themeId": "business",
+  "palette": {
+    "background": "#F6F9FF",
+    "main": "#2454E8",
+    "accent": "#F7A23B",
+    "text": "#17233E"
+  },
+  "paletteMapping": { "background": "base", "main": "sub", "accent": "accent" },
+  "masterElements": [],
+  "canvas": { "width": 13.333, "height": 7.5, "unit": "in" },
+  "updatedAt": "2026-10-29T00:00:00.000Z",
+  "course": {
+    "subtitle": "構成から発表まで",
+    "audience": "仕事でスライドを作る初心者",
+    "objectives": ["伝わる構成を作れる", "見やすいスライドを作れる"],
+    "prerequisites": ["ブラウザの基本操作"],
+    "description": "台本を整えながら、伝わるスライドの基本を学びます。",
+    "charactersPerMinute": 300,
+    "sections": [
+      {
+        "id": "section-1",
+        "title": "準備",
+        "lectures": [
+          {
+            "id": "lecture-1",
+            "title": "講座の進め方",
+            "slideIds": ["slide-1"]
+          },
+          {
+            "id": "lecture-2",
+            "title": "伝える相手を決める",
+            "slideIds": ["slide-2"]
+          }
+        ]
+      },
+      {
+        "id": "section-2",
+        "title": "制作",
+        "lectures": [
+          {
+            "id": "lecture-3",
+            "title": "構成を組み立てる",
+            "slideIds": ["slide-3"]
+          },
+          {
+            "id": "lecture-4",
+            "title": "デザインを整える",
+            "slideIds": ["slide-4"]
+          }
+        ]
+      },
+      {
+        "id": "section-3",
+        "title": "仕上げ",
+        "lectures": [
+          { "id": "lecture-5", "title": "発表と確認", "slideIds": ["slide-5"] }
+        ]
+      }
+    ]
+  },
+  "slides": [
+    {
+      "id": "slide-1",
+      "hidden": false,
+      "showMaster": true,
+      "notes": [],
+      "narration": "この講座では、伝わるスライドの作り方を順番に学びます。",
+      "elements": [
+        {
+          "id": "text-1",
+          "type": "text",
+          "x": 1,
+          "y": 2,
+          "width": 11,
+          "height": 2,
+          "text": "講座の進め方",
+          "style": { "fontSize": 40, "bold": true }
+        }
+      ]
+    },
+    {
+      "id": "slide-2",
+      "hidden": false,
+      "showMaster": true,
+      "notes": [],
+      "narration": "まず、誰に何を伝えるのかを明確にしましょう。",
+      "elements": [
+        {
+          "id": "text-2",
+          "type": "text",
+          "x": 1,
+          "y": 2,
+          "width": 11,
+          "height": 2,
+          "text": "伝える相手を決める",
+          "style": { "fontSize": 40, "bold": true }
+        }
+      ]
+    },
+    {
+      "id": "slide-3",
+      "hidden": false,
+      "showMaster": true,
+      "notes": [],
+      "narration": "主張、理由、具体例の順番で構成を作ります。",
+      "elements": [
+        {
+          "id": "text-3",
+          "type": "text",
+          "x": 1,
+          "y": 2,
+          "width": 11,
+          "height": 2,
+          "text": "構成を組み立てる",
+          "style": { "fontSize": 40, "bold": true }
+        }
+      ]
+    },
+    {
+      "id": "slide-4",
+      "hidden": false,
+      "showMaster": true,
+      "notes": [],
+      "narration": "色と余白をそろえて読みやすくします。",
+      "elements": [
+        {
+          "id": "text-4",
+          "type": "text",
+          "x": 1,
+          "y": 2,
+          "width": 11,
+          "height": 2,
+          "text": "デザインを整える",
+          "style": { "fontSize": 40, "bold": true }
+        }
+      ]
+    },
+    {
+      "id": "slide-5",
+      "hidden": false,
+      "showMaster": true,
+      "notes": [],
+      "narration": "最後に発表モードで全体を確認します。",
+      "elements": [
+        {
+          "id": "text-5",
+          "type": "text",
+          "x": 1,
+          "y": 2,
+          "width": 11,
+          "height": 2,
+          "text": "発表と確認",
+          "style": { "fontSize": 40, "bold": true }
+        }
+      ]
+    }
+  ]
+}

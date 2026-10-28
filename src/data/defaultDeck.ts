@@ -81,6 +81,7 @@ export function makeSlide(
     hidden: false,
     showMaster: true,
     notes: [],
+    narration: "",
     elements: [
       makeText(eyebrow, 1.02, 1.65, 10.8, 0.35, 12, true),
       makeText(title, 1.02, 2.28, 10.7, 2.15, 44, true),
@@ -91,6 +92,7 @@ export function makeSlide(
 
 export const defaultDeck: Deck = {
   schemaVersion: SCHEMA_VERSION,
+  mode: "deck",
   id: "welcome-deck",
   title: "言葉を、伝わる形へ。",
   template: "paper",

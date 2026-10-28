@@ -109,6 +109,196 @@ header {
   display: flex;
   gap: 8px;
 }
+.mode-switch {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-surface-muted);
+}
+.mode-switch button {
+  border: 0;
+  border-radius: 6px;
+  padding: 0 8px;
+  background: transparent;
+  color: var(--ui-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.mode-switch button.active {
+  background: var(--ui-primary);
+  color: white;
+}
+.course-outline {
+  overflow: auto;
+  height: 100%;
+  padding: 12px;
+}
+.course-info-link {
+  width: 100%;
+  border: 1px solid var(--ui-primary);
+  border-radius: 6px;
+  background: var(--ui-primary-soft);
+  color: var(--ui-primary);
+  padding: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.course-outline-summary {
+  margin: 12px 0;
+  padding: 11px;
+  border-radius: 7px;
+  background: var(--ui-surface-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.course-outline-summary strong,
+.course-outline-summary small {
+  display: block;
+}
+.course-outline-summary small {
+  color: var(--ui-muted);
+}
+.course-outline-summary p {
+  color: #a55017;
+  margin: 7px 0 0;
+}
+.course-tree {
+  display: grid;
+  gap: 10px;
+}
+.course-section {
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--ui-surface);
+}
+.course-lecture {
+  margin: 7px 0 7px 8px;
+  padding: 5px 0 5px 7px;
+  border-left: 2px solid var(--ui-border);
+}
+.course-lecture small {
+  display: block;
+  padding: 2px 0 4px 26px;
+  color: var(--ui-muted);
+}
+.course-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.course-tree-row span {
+  flex: none;
+  min-width: 20px;
+  color: var(--ui-primary);
+  font-size: 10px;
+  font-weight: 700;
+}
+.course-drag-handle {
+  cursor: grab;
+  user-select: none;
+}
+.course-tree-row input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 700;
+}
+.course-tree-row button {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: var(--ui-muted);
+  cursor: pointer;
+  padding: 3px;
+}
+.course-slide-link {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 5px;
+  padding: 5px 7px;
+  text-align: left;
+  background: transparent;
+  color: var(--ui-text);
+  font-size: 10px;
+  cursor: pointer;
+}
+.course-slide-link.active {
+  background: var(--ui-primary-soft);
+  color: var(--ui-primary);
+  font-weight: 700;
+}
+.course-add-lecture {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--ui-primary);
+  padding: 5px;
+  font-size: 10px;
+  cursor: pointer;
+}
+.course-info-screen {
+  overflow: auto;
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 30px;
+  display: grid;
+  gap: 14px;
+}
+.course-info-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.course-info-head h2 {
+  margin: 0;
+}
+.course-info-head button {
+  border: 1px solid var(--ui-primary);
+  border-radius: 6px;
+  background: white;
+  color: var(--ui-primary);
+  padding: 8px;
+  cursor: pointer;
+}
+.course-info-screen label {
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.course-info-screen input,
+.course-info-screen textarea {
+  width: 100%;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  padding: 9px;
+  background: white;
+  font: inherit;
+  font-weight: 400;
+}
+.course-info-screen textarea {
+  min-height: 70px;
+  resize: vertical;
+}
+.narration-panel textarea {
+  width: 100%;
+  min-height: 300px;
+  resize: vertical;
+  padding: 9px;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  font: inherit;
+}
 .header-actions button,
 .primary {
   height: 37px;

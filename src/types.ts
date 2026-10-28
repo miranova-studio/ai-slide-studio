@@ -1,5 +1,5 @@
 import type { ThemePalette, PaletteMapping } from "./themes";
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 export const SLIDE_WIDTH = 13.333;
 export const SLIDE_HEIGHT = 7.5;
 export type TemplateId = "paper" | "ink" | "signal";
@@ -56,9 +56,37 @@ export interface Slide {
   hidden: boolean;
   notes: SlideNote[];
   showMaster: boolean;
+  narration: string;
+  audio?: {
+    id: string;
+    filename: string;
+    mimeType: string;
+    kind: "ai" | "self";
+    durationSeconds: number;
+  };
+}
+export interface CourseLecture {
+  id: string;
+  title: string;
+  slideIds: string[];
+}
+export interface CourseSection {
+  id: string;
+  title: string;
+  lectures: CourseLecture[];
+}
+export interface CourseData {
+  subtitle: string;
+  audience: string;
+  objectives: string[];
+  prerequisites: string[];
+  description: string;
+  charactersPerMinute: number;
+  sections: CourseSection[];
 }
 export interface Deck {
   schemaVersion: number;
+  mode: "deck" | "course";
   id: string;
   title: string;
   template: TemplateId;
@@ -69,5 +97,6 @@ export interface Deck {
   masterElements: SlideElement[];
   canvas: { width: number; height: number; unit: "in" };
   slides: Slide[];
+  course?: CourseData;
   updatedAt: string;
 }

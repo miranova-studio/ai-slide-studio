@@ -1,5 +1,6 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
+  "mode": "deck",
   "id": "japanese-sample",
   "title": "日本語PDF検証",
   "template": "paper",
@@ -19,6 +20,7 @@
       "id": "sample-slide-1",
       "hidden": false,
       "showMaster": true,
+      "narration": "",
       "notes": [],
       "elements": [
         {
@@ -57,6 +59,7 @@
       "id": "sample-slide-2",
       "hidden": false,
       "showMaster": true,
+      "narration": "",
       "notes": [],
       "elements": [
         {

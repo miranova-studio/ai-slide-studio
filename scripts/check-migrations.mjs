@@ -11,12 +11,22 @@ try {
   const { migrateDeck, assertDeck } = await vite.ssrLoadModule(
     "/src/schema/validate.ts",
   );
-  const v4 = JSON.parse(
+  const v5 = JSON.parse(
     await readFile(
       new URL("../examples/japanese-sample.json", import.meta.url),
       "utf8",
     ),
   );
+  const course = JSON.parse(
+    await readFile(
+      new URL("../docs/examples/course-sample.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  const v4 = structuredClone(v5);
+  v4.schemaVersion = 4;
+  delete v4.mode;
+  for (const slide of v4.slides) delete slide.narration;
   const v3 = structuredClone(v4);
   v3.schemaVersion = 3;
   delete v3.themeId;
@@ -33,16 +43,22 @@ try {
     ),
   );
   for (const [label, value] of [
+    ["course", course],
+    ["v5", v5],
     ["v4", v4],
     ["v3", v3],
     ["v2", v2],
     ["v1", v1],
   ]) {
     const result = assertDeck(migrateDeck(value));
-    if (result.schemaVersion !== 4 || result.slides.length === 0)
+    if (
+      result.schemaVersion !== 5 ||
+      result.slides.length === 0 ||
+      (label === "course" && result.mode !== "course")
+    )
       throw new Error(`${label}: 移行結果が不正です`);
   }
-  console.log("v1/v2/v3/v4 deck migration: valid");
+  console.log("v1/v2/v3/v4/v5 deck migration: valid");
 } finally {
   await vite.close();
 }

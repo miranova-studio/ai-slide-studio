@@ -1,11 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://frame.local/schema/slide-deck.v4.json",
-  "title": "FRAME Slide Deck v4",
+  "$id": "https://frame.local/schema/slide-deck.v5.json",
+  "title": "FRAME Slide Deck v5",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schemaVersion",
+    "mode",
     "id",
     "title",
     "template",
@@ -18,7 +19,8 @@
     "updatedAt"
   ],
   "properties": {
-    "schemaVersion": { "const": 4 },
+    "schemaVersion": { "const": 5 },
+    "mode": { "enum": ["deck", "course"] },
     "id": { "type": "string", "minLength": 1 },
     "title": { "type": "string" },
     "template": { "enum": ["paper", "ink", "signal"] },
@@ -64,18 +66,104 @@
       "type": "array",
       "minItems": 1,
       "items": { "$ref": "#/$defs/slide" }
+    },
+    "course": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subtitle",
+        "audience",
+        "objectives",
+        "prerequisites",
+        "description",
+        "charactersPerMinute",
+        "sections"
+      ],
+      "properties": {
+        "subtitle": { "type": "string" },
+        "audience": { "type": "string" },
+        "objectives": { "type": "array", "items": { "type": "string" } },
+        "prerequisites": { "type": "array", "items": { "type": "string" } },
+        "description": { "type": "string" },
+        "charactersPerMinute": { "type": "number", "exclusiveMinimum": 0 },
+        "sections": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/courseSection" }
+        }
+      }
     }
   },
+  "allOf": [
+    {
+      "if": { "properties": { "mode": { "const": "course" } } },
+      "then": { "required": ["course"] }
+    }
+  ],
   "$defs": {
+    "courseSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "lectures"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string" },
+        "lectures": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/courseLecture" }
+        }
+      }
+    },
+    "courseLecture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "slideIds"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string" },
+        "slideIds": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
     "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
     "slide": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "elements", "hidden", "notes", "showMaster"],
+      "required": [
+        "id",
+        "elements",
+        "hidden",
+        "notes",
+        "showMaster",
+        "narration"
+      ],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "hidden": { "type": "boolean" },
         "showMaster": { "type": "boolean" },
+        "narration": { "type": "string" },
+        "audio": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "filename", "mimeType", "kind", "durationSeconds"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "filename": { "type": "string", "minLength": 1 },
+            "mimeType": {
+              "enum": [
+                "audio/mpeg",
+                "audio/wav",
+                "audio/x-wav",
+                "audio/mp4",
+                "audio/x-m4a"
+              ]
+            },
+            "kind": { "enum": ["ai", "self"] },
+            "durationSeconds": { "type": "number", "minimum": 0 }
+          }
+        },
         "notes": { "type": "array", "items": { "$ref": "#/$defs/note" } },
         "elements": { "type": "array", "items": { "$ref": "#/$defs/element" } }
       }
