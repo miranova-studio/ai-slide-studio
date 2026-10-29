@@ -82,6 +82,11 @@ export function formatDuration(seconds: number): string {
   return `${Math.floor(minutes / 60)}時間${String(minutes % 60).padStart(2, "0")}分`;
 }
 
+export function formatClock(seconds: number): string {
+  const rounded = Math.round(seconds);
+  return `${Math.floor(rounded / 60)}:${String(rounded % 60).padStart(2, "0")}`;
+}
+
 export function slideFileStem(
   sectionIndex: number,
   lectureIndex: number,

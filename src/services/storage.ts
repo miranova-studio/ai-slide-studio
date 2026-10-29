@@ -10,11 +10,14 @@ const ACTIVE_KEY = "active";
 const LEGACY_KEY = "frame-slide-deck-v1";
 
 const THEMES_STORE = "themes";
-const database = openDB(DB_NAME, 2, {
+const AUDIO_STORE = "audio";
+const database = openDB(DB_NAME, 3, {
   upgrade(db) {
     if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
     if (!db.objectStoreNames.contains(THEMES_STORE))
       db.createObjectStore(THEMES_STORE);
+    if (!db.objectStoreNames.contains(AUDIO_STORE))
+      db.createObjectStore(AUDIO_STORE);
   },
 });
 
@@ -44,4 +47,19 @@ export async function loadCustomThemes(): Promise<Theme[]> {
 export async function saveCustomTheme(theme: Theme): Promise<void> {
   const db = await database;
   await db.put(THEMES_STORE, theme, theme.id);
+}
+
+export async function saveAudio(id: string, blob: Blob): Promise<void> {
+  const db = await database;
+  await db.put(AUDIO_STORE, blob, id);
+}
+
+export async function loadAudio(id: string): Promise<Blob | undefined> {
+  const db = await database;
+  return db.get(AUDIO_STORE, id);
+}
+
+export async function deleteAudio(id: string): Promise<void> {
+  const db = await database;
+  await db.delete(AUDIO_STORE, id);
 }

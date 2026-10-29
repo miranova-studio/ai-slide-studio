@@ -30,6 +30,9 @@ import {
   saveDeck,
   loadCustomThemes,
   saveCustomTheme,
+  saveAudio,
+  loadAudio,
+  deleteAudio,
 } from "./services/storage";
 import { ThemePanel } from "./components/ThemePanel";
 import { CourseOutline } from "./components/CourseOutline";
@@ -54,6 +57,7 @@ import {
   courseDuration,
   courseSlides,
   formatDuration,
+  formatClock,
   lectureDuration,
   lectureForSlide,
   makeCourse,
@@ -366,12 +370,17 @@ export default function App() {
   const [railTab, setRailTab] = useState<RailTab>("thumbnails");
   const [panelTab, setPanelTab] = useState<PanelTab>("edit");
   const [courseInfoOpen, setCourseInfoOpen] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [bulkUnmatched, setBulkUnmatched] = useState<string[]>([]);
+  const [exportingCourse, setExportingCourse] = useState(false);
   const [noteKind, setNoteKind] = useState<NoteKind>("revision");
   const [noteText, setNoteText] = useState("");
   const [toast, setToast] = useState("");
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const imageFileRef = useRef<HTMLInputElement>(null);
   const jsonFileRef = useRef<HTMLInputElement>(null);
+  const audioFileRef = useRef<HTMLInputElement>(null);
+  const bulkAudioRef = useRef<HTMLInputElement>(null);
   const activeIndex = Math.max(
     0,
     deck.slides.findIndex((slide) => slide.id === activeId),
@@ -423,6 +432,21 @@ export default function App() {
     );
     field?.focus();
   }, [editingTextId]);
+
+  useEffect(() => {
+    let url: string | null = null;
+    setAudioUrl(null);
+    if (activeSlide?.audio)
+      loadAudio(activeSlide.audio.id).then((blob) => {
+        if (blob) {
+          url = URL.createObjectURL(blob);
+          setAudioUrl(url);
+        }
+      });
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [activeSlide?.audio?.id]);
 
   useEffect(() => {
     if (!thumbnailMenu) return;
@@ -918,6 +942,150 @@ export default function App() {
       notify("JSONを書き出しました");
     } catch (error) {
       notify(error instanceof Error ? error.message : "JSONを書き出せません");
+    }
+  }
+  function audioMime(file: File): string | null {
+    const extension = file.name.split(".").pop()?.toLowerCase();
+    return extension === "mp3"
+      ? "audio/mpeg"
+      : extension === "wav"
+        ? "audio/wav"
+        : extension === "m4a"
+          ? "audio/mp4"
+          : null;
+  }
+  async function measureAudio(file: File): Promise<number> {
+    const url = URL.createObjectURL(file);
+    try {
+      return await new Promise<number>((resolve, reject) => {
+        const player = new Audio();
+        player.preload = "metadata";
+        player.onloadedmetadata = () =>
+          Number.isFinite(player.duration) && player.duration > 0
+            ? resolve(player.duration)
+            : reject(new Error("音声の長さを読めません"));
+        player.onerror = () =>
+          reject(new Error("音声ファイルを再生できません"));
+        player.src = url;
+      });
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+  async function attachAudio(file: File, slideId: string, kind: "ai" | "self") {
+    const mimeType = audioMime(file);
+    if (!mimeType)
+      throw new Error(`${file.name}: mp3 / wav / m4a を選んでください`);
+    const durationSeconds = await measureAudio(file);
+    const id = crypto.randomUUID();
+    await saveAudio(id, file);
+    return {
+      slideId,
+      audio: { id, filename: file.name, mimeType, kind, durationSeconds },
+    };
+  }
+  async function uploadAudio(file?: File) {
+    if (!file) return;
+    try {
+      const entry = await attachAudio(
+        file,
+        activeId,
+        activeSlide.audio?.kind || "ai",
+      );
+      changeSlide((slide) => ({ ...slide, audio: entry.audio }));
+      notify(`${file.name} を保存しました`);
+    } catch (error) {
+      notify(
+        error instanceof Error ? error.message : "音声を取り込めませんでした",
+      );
+    }
+    if (audioFileRef.current) audioFileRef.current.value = "";
+  }
+  async function removeAudio() {
+    if (!activeSlide.audio) return;
+    await deleteAudio(activeSlide.audio.id);
+    changeSlide((slide) => {
+      const { audio: _audio, ...rest } = slide;
+      return rest;
+    });
+    notify("音声を削除しました");
+  }
+  async function importBulkAudio(files: FileList | null) {
+    if (!files || !deck.course) return;
+    const unmatched: string[] = [];
+    const attachments: Awaited<ReturnType<typeof attachAudio>>[] = [];
+    for (const file of Array.from(files)) {
+      const match = /^S(\d+)-L(\d+)-(\d+)\.(mp3|wav|m4a)$/i.exec(file.name);
+      const slideId =
+        match &&
+        deck.course.sections[Number(match[1]) - 1]?.lectures[
+          Number(match[2]) - 1
+        ]?.slideIds[Number(match[3]) - 1];
+      if (!slideId) {
+        unmatched.push(file.name);
+        continue;
+      }
+      try {
+        attachments.push(await attachAudio(file, slideId, "ai"));
+      } catch {
+        unmatched.push(file.name);
+      }
+    }
+    if (attachments.length)
+      changeDeck((current) => ({
+        ...current,
+        slides: current.slides.map((slide) => ({
+          ...slide,
+          audio:
+            attachments.find((entry) => entry.slideId === slide.id)?.audio ||
+            slide.audio,
+        })),
+      }));
+    setBulkUnmatched(unmatched);
+    notify(
+      `${attachments.length}件を割り当て、${unmatched.length}件は未割り当てです`,
+    );
+    if (bulkAudioRef.current) bulkAudioRef.current.value = "";
+  }
+  async function exportScripts() {
+    if (!deck.course) return;
+    try {
+      const { downloadBlob, scriptCsv, scriptsZip, safeFilePart } =
+        await import("./services/courseFiles");
+      downloadBlob(
+        await scriptsZip(deck),
+        `${safeFilePart(deck.title)}-scripts.zip`,
+      );
+      downloadBlob(
+        new Blob([scriptCsv(deck)], { type: "text/csv;charset=utf-8" }),
+        `${safeFilePart(deck.title)}-scripts.csv`,
+      );
+      notify("台本ZIPと一覧CSVを書き出しました");
+    } catch (error) {
+      notify(
+        error instanceof Error ? error.message : "台本を書き出せませんでした",
+      );
+    }
+  }
+  async function exportCoursePackage() {
+    if (!deck.course || exportingCourse) return;
+    setExportingCourse(true);
+    try {
+      const { coursePackageZip, downloadBlob, safeFilePart } =
+        await import("./services/courseFiles");
+      downloadBlob(
+        await coursePackageZip(assertDeck(deck)),
+        `${safeFilePart(deck.title)}-course.zip`,
+      );
+      notify("講座一式ZIPを書き出しました");
+    } catch (error) {
+      notify(
+        error instanceof Error
+          ? error.message
+          : "講座一式を書き出せませんでした",
+      );
+    } finally {
+      setExportingCourse(false);
     }
   }
   function downloadJson(value: unknown, filename: string) {
@@ -2139,32 +2307,146 @@ export default function App() {
                 notify={notify}
               />
             ) : panelTab === "narration" && deck.course ? (
-              <div className="panel-section narration-panel">
-                <h3>ナレーション台本</h3>
-                <p className="panel-help">
-                  {currentLecture?.title || "レクチャー"} · このスライドの台本
-                </p>
-                <textarea
-                  aria-label="ナレーション台本"
-                  value={activeSlide.narration}
-                  onChange={(event) =>
-                    changeSlide((slide) => ({
-                      ...slide,
-                      narration: event.target.value,
-                    }))
-                  }
-                  placeholder="このスライドで話す内容を入力"
-                />
-                <p>
-                  {[...activeSlide.narration].length}字 · 話す時間の目安{" "}
-                  {formatDuration(
-                    slideDuration(activeSlide, deck.course.charactersPerMinute),
+              <div className="narration-panel">
+                <div className="panel-section">
+                  <h3>ナレーション台本</h3>
+                  <p className="panel-help">
+                    {currentLecture?.title || "レクチャー"} · このスライドの台本
+                  </p>
+                  <textarea
+                    aria-label="ナレーション台本"
+                    value={activeSlide.narration}
+                    onChange={(event) =>
+                      changeSlide((slide) => ({
+                        ...slide,
+                        narration: event.target.value,
+                      }))
+                    }
+                    placeholder="このスライドで話す内容を入力"
+                  />
+                  <p>
+                    {[...activeSlide.narration].length}字 · 話す時間の目安{" "}
+                    {formatDuration(
+                      slideDuration(
+                        activeSlide,
+                        deck.course.charactersPerMinute,
+                      ),
+                    )}
+                  </p>
+                  <p className="panel-help">
+                    {deck.course.charactersPerMinute}
+                    字/分。講座情報で変更できます。
+                  </p>
+                </div>
+                <div className="panel-section">
+                  <h3>このスライドの音声</h3>
+                  <input
+                    ref={audioFileRef}
+                    hidden
+                    type="file"
+                    accept=".mp3,.wav,.m4a,audio/mpeg,audio/wav,audio/mp4"
+                    onChange={(event) => uploadAudio(event.target.files?.[0])}
+                  />
+                  <button
+                    className="course-file-action"
+                    onClick={() => audioFileRef.current?.click()}
+                  >
+                    {activeSlide.audio ? "音声を差し替える" : "音声を取り込む"}
+                    （mp3 / wav / m4a）
+                  </button>
+                  {activeSlide.audio && (
+                    <>
+                      <label className="course-audio-kind">
+                        音声の種類
+                        <select
+                          aria-label="音声の種類"
+                          value={activeSlide.audio.kind}
+                          onChange={(event) =>
+                            changeSlide((slide) => ({
+                              ...slide,
+                              audio: {
+                                ...slide.audio!,
+                                kind: event.target.value as "ai" | "self",
+                              },
+                            }))
+                          }
+                        >
+                          <option value="ai">AI音声</option>
+                          <option value="self">自分の声</option>
+                        </select>
+                      </label>
+                      <p>
+                        {activeSlide.audio.filename} · 実際の長さ{" "}
+                        {formatClock(activeSlide.audio.durationSeconds)}
+                      </p>
+                      {audioUrl ? (
+                        <audio
+                          controls
+                          src={audioUrl}
+                          aria-label="スライドの音声"
+                        />
+                      ) : (
+                        <p className="panel-help">
+                          音声ファイルが見つかりません。再取り込みしてください。
+                        </p>
+                      )}
+                      <button
+                        className="course-file-action danger"
+                        onClick={removeAudio}
+                      >
+                        音声を削除
+                      </button>
+                    </>
                   )}
-                </p>
-                <p className="panel-help">
-                  {deck.course.charactersPerMinute}
-                  字/分。講座情報で変更できます。
-                </p>
+                </div>
+                <div className="panel-section">
+                  <h3>AI音声との受け渡し</h3>
+                  <button
+                    className="course-file-action"
+                    onClick={exportScripts}
+                  >
+                    台本ZIP＋一覧CSVを書き出す
+                  </button>
+                  <input
+                    ref={bulkAudioRef}
+                    hidden
+                    multiple
+                    type="file"
+                    accept=".mp3,.wav,.m4a,audio/mpeg,audio/wav,audio/mp4"
+                    onChange={(event) => importBulkAudio(event.target.files)}
+                  />
+                  <button
+                    className="course-file-action"
+                    onClick={() => bulkAudioRef.current?.click()}
+                  >
+                    音声を一括取り込み
+                  </button>
+                  {bulkUnmatched.length > 0 && (
+                    <div className="course-unmatched">
+                      <strong>割り当てられなかったファイル</strong>
+                      <ul>
+                        {bulkUnmatched.map((name) => (
+                          <li key={name}>{name}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+                <div className="panel-section">
+                  <h3>講座一式</h3>
+                  <button
+                    className="course-file-action"
+                    disabled={exportingCourse}
+                    onClick={exportCoursePackage}
+                  >
+                    {exportingCourse
+                      ? "PDFとZIPを作成中…"
+                      : "講座一式ZIPを書き出す"}
+                  </button>
+                  <p className="panel-help">
+                    講座JSON、台本、レクチャー別PDF、音声、説明文を含みます。
+                  </p>
+                </div>
               </div>
             ) : (
               <div className="notes-panel">
