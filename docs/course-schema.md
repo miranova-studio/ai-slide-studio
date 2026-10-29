@@ -9,3 +9,5 @@
 各スライドの `narration` はそのスライドのナレーション台本です。目安時間はUnicode文字数÷`charactersPerMinute`×60秒です。`audio` がある場合、実音声の `durationSeconds` を優先します。`audio` は `id`、`filename`、`mimeType`、`kind`（`ai`/`self`）、`durationSeconds` を持つメタデータで、音声本体はIndexedDBに保存されます。JSON単体では音声ファイルは含まれません。
 
 旧schemaVersion 1〜4のスライドJSONは `mode: "deck"`、空の台本として移行します。講座に変えると、既存スライドを1セクション・1レクチャーにまとめます。スライド要素の16:9座標とスタイルは [スライド仕様](slide-schema.md) を参照してください。
+
+書き出し時の台本ファイル名は `S01-L02-03.txt`（セクション01・レクチャー02・その中のスライド03）です。同じ幹の `mp3` / `wav` / `m4a` を一括取り込みすると、現在の目次順序に基づいて自動割当します。台本ZIPには `scripts/` と `scripts-index.csv`（UTF-8 BOM付き）が入り、CSVは単独でも出せます。講座一式ZIPには `course.json`、一覧CSV、講座説明文、セクション／レクチャー順のフォルダごとに台本・音声・`slides.pdf` が入ります。現時点でZIP全体の再インポートは未対応です。

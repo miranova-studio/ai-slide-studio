@@ -435,15 +435,17 @@ export default function App() {
 
   useEffect(() => {
     let url: string | null = null;
+    let cancelled = false;
     setAudioUrl(null);
     if (activeSlide?.audio)
       loadAudio(activeSlide.audio.id).then((blob) => {
-        if (blob) {
+        if (blob && !cancelled) {
           url = URL.createObjectURL(blob);
           setAudioUrl(url);
         }
       });
     return () => {
+      cancelled = true;
       if (url) URL.revokeObjectURL(url);
     };
   }, [activeSlide?.audio?.id]);
@@ -741,7 +743,7 @@ export default function App() {
       const slides = [...current.slides];
       slides.splice(activeIndex + 1, 0, next);
       const course =
-        current.mode === "course" && current.course
+        current.course
           ? {
               ...current.course,
               sections: current.course.sections.map((section) => ({
@@ -767,7 +769,6 @@ export default function App() {
   function deleteSlide(id: string) {
     if (deck.slides.length === 1) return notify("最後の1枚は削除できません");
     if (
-      deck.mode === "course" &&
       deck.course &&
       lectureForSlide(deck.course, id)?.slideIds.length === 1
     )
@@ -819,7 +820,23 @@ export default function App() {
       if (from < 0 || to < 0) return current;
       const [moved] = slides.splice(from, 1);
       slides.splice(to, 0, moved);
-      return { ...current, slides };
+      const course = current.course
+        ? {
+            ...current.course,
+            sections: current.course.sections.map((section) => ({
+              ...section,
+              lectures: section.lectures.map((lecture) => ({
+                ...lecture,
+                slideIds: [...lecture.slideIds].sort(
+                  (a, b) =>
+                    slides.findIndex((slide) => slide.id === a) -
+                    slides.findIndex((slide) => slide.id === b),
+                ),
+              })),
+            })),
+          }
+        : undefined;
+      return { ...current, slides, course };
     });
     setDraggedId(null);
   }
@@ -1050,22 +1067,28 @@ export default function App() {
   async function exportScripts() {
     if (!deck.course) return;
     try {
-      const { downloadBlob, scriptCsv, scriptsZip, safeFilePart } =
+      const { downloadBlob, scriptsZip, safeFilePart } =
         await import("./services/courseFiles");
       downloadBlob(
         await scriptsZip(deck),
         `${safeFilePart(deck.title)}-scripts.zip`,
       );
-      downloadBlob(
-        new Blob([scriptCsv(deck)], { type: "text/csv;charset=utf-8" }),
-        `${safeFilePart(deck.title)}-scripts.csv`,
-      );
-      notify("台本ZIPと一覧CSVを書き出しました");
+      notify("台本ZIPを書き出しました（一覧CSVを同梱）");
     } catch (error) {
       notify(
         error instanceof Error ? error.message : "台本を書き出せませんでした",
       );
     }
+  }
+  async function exportScriptCsv() {
+    if (!deck.course) return;
+    const { downloadBlob, scriptCsv, safeFilePart } =
+      await import("./services/courseFiles");
+    downloadBlob(
+      new Blob([scriptCsv(deck)], { type: "text/csv;charset=utf-8" }),
+      `${safeFilePart(deck.title)}-scripts.csv`,
+    );
+    notify("台本一覧CSVを書き出しました");
   }
   async function exportCoursePackage() {
     if (!deck.course || exportingCourse) return;
@@ -2405,7 +2428,13 @@ export default function App() {
                     className="course-file-action"
                     onClick={exportScripts}
                   >
-                    台本ZIP＋一覧CSVを書き出す
+                    台本ZIPを書き出す（CSV同梱）
+                  </button>
+                  <button
+                    className="course-file-action"
+                    onClick={exportScriptCsv}
+                  >
+                    一覧CSVを単独で書き出す
                   </button>
                   <input
                     ref={bulkAudioRef}
