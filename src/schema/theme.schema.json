@@ -30,6 +30,15 @@
         "text": { "$ref": "#/$defs/color" }
       }
     },
+    "palettePreferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseMode", "textMode"],
+      "properties": {
+        "baseMode": { "enum": ["original", "white", "black"] },
+        "textMode": { "enum": ["auto", "white", "black"] }
+      }
+    },
     "fonts": {
       "type": "object",
       "additionalProperties": false,

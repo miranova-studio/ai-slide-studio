@@ -28,9 +28,7 @@ try {
       typeof palette.name !== "string" ||
       ![palette.base, palette.sub, palette.accent].every((color) =>
         /^#[0-9a-fA-F]{6}$/.test(color),
-      ) ||
-      !Array.isArray(palette.tags) ||
-      !Array.isArray(palette.purposes)
+      )
     ) {
       throw new Error(`不正なパレット: ${palette.id ?? "unknown"}`);
     }

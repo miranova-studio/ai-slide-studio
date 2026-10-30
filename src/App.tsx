@@ -43,6 +43,7 @@ import {
   applyPaletteToDeck,
   builtInThemes,
   mappedPalette,
+  DEFAULT_PALETTE_PREFERENCES,
   layoutSlide,
 } from "./themes";
 import type {
@@ -51,6 +52,7 @@ import type {
   ThemeFonts,
   MiranovaPalette,
   PaletteMapping,
+  PalettePreferences,
 } from "./themes";
 import { SLIDE_HEIGHT, SLIDE_WIDTH } from "./types";
 import {
@@ -1121,13 +1123,14 @@ export default function App() {
     link.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  function applyPalette(palette: MiranovaPalette, mapping: PaletteMapping) {
+  function applyPalette(palette: MiranovaPalette, mapping: PaletteMapping, preferences: PalettePreferences) {
     changeDeck((current) =>
       applyPaletteToDeck(
         current,
-        mappedPalette(palette, mapping),
+        mappedPalette(palette, mapping, preferences),
         palette.id,
         mapping,
+        preferences,
       ),
     );
   }
@@ -1152,6 +1155,7 @@ export default function App() {
     const theme: Theme = {
       ...activeTheme,
       palette: deck.palette,
+      palettePreferences: deck.palettePreferences,
       masterElements: deck.masterElements.filter(
         (item): item is Theme["masterElements"][number] =>
           item.type === "shape" || item.type === "image",
@@ -1177,6 +1181,7 @@ export default function App() {
         name: `${name.trim() || activeTheme.name} / ${label}`,
         category: "カスタム",
         palette: deck.palette,
+        palettePreferences: deck.palettePreferences,
         masterElements: deck.masterElements.filter(
           (item): item is Theme["masterElements"][number] =>
             item.type === "shape" || item.type === "image",
@@ -2317,6 +2322,8 @@ export default function App() {
                 themes={themes}
                 themeId={deck.themeId}
                 mapping={deck.paletteMapping}
+                preferences={deck.palettePreferences || DEFAULT_PALETTE_PREFERENCES}
+                appliedPalette={deck.palette}
                 paletteId={deck.paletteId}
                 onTheme={(theme) => {
                   changeDeck((current) => applyThemeToDeck(current, theme));

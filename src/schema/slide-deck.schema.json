@@ -47,6 +47,15 @@
         "accent": { "enum": ["base", "sub", "accent"] }
       }
     },
+    "palettePreferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseMode", "textMode"],
+      "properties": {
+        "baseMode": { "enum": ["original", "white", "black"] },
+        "textMode": { "enum": ["auto", "white", "black"] }
+      }
+    },
     "masterElements": {
       "type": "array",
       "items": { "$ref": "#/$defs/element" }

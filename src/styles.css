@@ -1654,3 +1654,6 @@ textarea:focus-visible,
     grid-template-columns: 210px minmax(520px, 1fr) 250px;
   }
 }
+.palette-detail { padding: 12px; margin: 10px 0; border: 1px solid var(--ui-border, #dce5f1); border-radius: 10px; background: var(--ui-surface, #fff); font-size: 12px; line-height: 1.5; }
+.palette-detail p { margin: 6px 0 0; }
+.palette-contrast-warning { color: #a13121; background: #fff0ec; padding: 9px 11px; border-radius: 8px; font-size: 12px; }

@@ -1,4 +1,4 @@
-import type { ThemePalette, PaletteMapping } from "./themes";
+import type { ThemePalette, PaletteMapping, PalettePreferences } from "./themes";
 export const SCHEMA_VERSION = 5;
 export const SLIDE_WIDTH = 13.333;
 export const SLIDE_HEIGHT = 7.5;
@@ -94,6 +94,7 @@ export interface Deck {
   palette: ThemePalette;
   paletteId?: string;
   paletteMapping: PaletteMapping;
+  palettePreferences?: PalettePreferences;
   masterElements: SlideElement[];
   canvas: { width: number; height: number; unit: "in" };
   slides: Slide[];

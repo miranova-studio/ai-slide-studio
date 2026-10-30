@@ -1,16 +1,18 @@
 import { useMemo, useState } from "react";
 import paletteData from "../data/miranova-palettes.json";
-import type { MiranovaPalette, PaletteMapping, Theme } from "../themes";
-import { parsePalettePaste } from "../themes";
+import type { MiranovaPalette, PaletteMapping, PalettePreferences, Theme, ThemePalette } from "../themes";
+import { contrastRatio, parsePalettePaste } from "../themes";
 
 const palettes = paletteData as MiranovaPalette[];
 type Props = {
   themes: Theme[];
   themeId: string;
   mapping: PaletteMapping;
+  preferences: PalettePreferences;
+  appliedPalette: ThemePalette;
   paletteId?: string;
   onTheme: (theme: Theme) => void;
-  onPalette: (palette: MiranovaPalette, mapping: PaletteMapping) => void;
+  onPalette: (palette: MiranovaPalette, mapping: PaletteMapping, preferences: PalettePreferences) => void;
   onImport: (file: File) => void;
   onExport: () => void;
   onSave: (name: string) => void;
@@ -21,6 +23,8 @@ export function ThemePanel({
   themes,
   themeId,
   mapping,
+  preferences,
+  appliedPalette,
   paletteId,
   onTheme,
   onPalette,
@@ -44,11 +48,11 @@ export function ThemePanel({
     [],
   );
   const tags = useMemo(
-    () => [...new Set(palettes.flatMap((item) => item.tags))].sort(),
+    () => [...new Set(palettes.flatMap((item) => item.tags || []))].sort(),
     [],
   );
   const purposes = useMemo(
-    () => [...new Set(palettes.flatMap((item) => item.purposes))].sort(),
+    () => [...new Set(palettes.flatMap((item) => item.purposes || []))].sort(),
     [],
   );
   const filtered = useMemo(
@@ -56,8 +60,8 @@ export function ThemePanel({
       palettes.filter(
         (item) =>
           (!category || item.category === category) &&
-          (!tag || item.tags.includes(tag)) &&
-          (!purpose || item.purposes.includes(purpose)) &&
+          (!tag || (item.tags || []).includes(tag)) &&
+          (!purpose || (item.purposes || []).includes(purpose) || item.purpose === purpose) &&
           (!query ||
             `${item.name} ${item.id}`
               .toLowerCase()
@@ -73,7 +77,10 @@ export function ThemePanel({
     value: PaletteMapping[keyof PaletteMapping],
   ) {
     const next = { ...mapping, [key]: value };
-    if (current) onPalette(current, next);
+    if (current) onPalette(current, next, preferences);
+  }
+  function setPreference<K extends keyof PalettePreferences>(key: K, value: PalettePreferences[K]) {
+    if (current) onPalette(current, mapping, { ...preferences, [key]: value });
   }
   function importPaste() {
     try {
@@ -87,7 +94,7 @@ export function ThemePanel({
         ...colors,
       };
       setCustomPalette(imported);
-      onPalette(imported, mapping);
+      onPalette(imported, mapping, preferences);
       notify("貼り付けた3色を適用しました");
     } catch (error) {
       notify(
@@ -175,7 +182,7 @@ export function ThemePanel({
             <button
               key={item.id}
               className={paletteId === item.id ? "active" : ""}
-              onClick={() => onPalette(item, mapping)}
+              onClick={() => onPalette(item, mapping, preferences)}
               title={item.description}
             >
               <span className="palette-swatches">
@@ -192,6 +199,14 @@ export function ThemePanel({
             </button>
           ))}
         </div>
+        {current && (
+          <div className="palette-detail">
+            <strong>{current.name} ({current.id})</strong>
+            {current.description && <p>{current.description}</p>}
+            {current.purpose && <p>用途：{current.purpose}</p>}
+            {current.selectionBasis && <p>選定理由：{current.selectionBasis}</p>}
+          </div>
+        )}
         <h4>色の割り当て</h4>
         {(["background", "main", "accent"] as const).map((key) => (
           <label className="mapping-row" key={key}>
@@ -212,8 +227,21 @@ export function ThemePanel({
             </select>
           </label>
         ))}
+        <label className="mapping-row">ベース色
+          <select aria-label="ベース色" value={preferences.baseMode} onChange={(event) => setPreference("baseMode", event.target.value as PalettePreferences["baseMode"])}>
+            <option value="original">元の色</option><option value="white">ホワイト（#FFFFFF）</option><option value="black">ブラック（#000000）</option>
+          </select>
+        </label>
+        <label className="mapping-row">文字色
+          <select aria-label="文字色" value={preferences.textMode} onChange={(event) => setPreference("textMode", event.target.value as PalettePreferences["textMode"])}>
+            <option value="auto">自動</option><option value="white">ホワイト</option><option value="black">ブラック</option>
+          </select>
+        </label>
+        {preferences.textMode !== "auto" && contrastRatio(appliedPalette.background, appliedPalette.text) < 4.5 && (
+          <p className="palette-contrast-warning" role="alert">読みにくい可能性があります（コントラスト比 {contrastRatio(appliedPalette.background, appliedPalette.text).toFixed(2)}:1）</p>
+        )}
         <p className="panel-help">
-          文字色は背景とのコントラスト比4.5:1以上になる黒／白を自動選択します。
+          自動の文字色は背景とのコントラスト比4.5:1以上になる黒／白を選択します。
         </p>
       </div>
       <div className="panel-section">

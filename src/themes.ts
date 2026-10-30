@@ -31,11 +31,20 @@ export interface Theme {
   name: string;
   category: string;
   palette: ThemePalette;
+  palettePreferences?: PalettePreferences;
   fonts: ThemeFonts;
   masterElements: (ShapeElement | ImageElement)[];
   layouts: { title: ThemeLayout; body: ThemeLayout; image: ThemeLayout };
 }
 export type PaletteSlot = "base" | "sub" | "accent";
+export type PalettePreferences = {
+  baseMode: "original" | "white" | "black";
+  textMode: "auto" | "white" | "black";
+};
+export const DEFAULT_PALETTE_PREFERENCES: PalettePreferences = {
+  baseMode: "original",
+  textMode: "auto",
+};
 export type PaletteMapping = {
   background: PaletteSlot;
   main: PaletteSlot;
@@ -108,19 +117,23 @@ export interface MiranovaPalette {
   sub: string;
   accent: string;
   description?: string;
-  tags: string[];
-  purposes: string[];
+  tags?: string[];
+  purposes?: string[];
+  purpose?: string;
+  selectionBasis?: string;
+  [key: string]: unknown;
 }
 export function mappedPalette(
   palette: MiranovaPalette,
   mapping: PaletteMapping,
+  preferences: PalettePreferences = DEFAULT_PALETTE_PREFERENCES,
 ): ThemePalette {
-  const background = palette[mapping.background];
+  const background = preferences.baseMode === "white" ? "#FFFFFF" : preferences.baseMode === "black" ? "#000000" : palette[mapping.background];
   return {
     background,
     main: palette[mapping.main],
     accent: palette[mapping.accent],
-    text: readableText(background),
+    text: preferences.textMode === "white" ? "#FFFFFF" : preferences.textMode === "black" ? "#000000" : readableText(background),
   };
 }
 export function applyPaletteToDeck(
@@ -128,6 +141,7 @@ export function applyPaletteToDeck(
   palette: ThemePalette,
   paletteId?: string,
   paletteMapping: PaletteMapping = DEFAULT_MAPPING,
+  palettePreferences: PalettePreferences = DEFAULT_PALETTE_PREFERENCES,
 ): Deck {
   const heading =
     contrastRatio(palette.background, palette.main) >= 4.5
@@ -138,6 +152,7 @@ export function applyPaletteToDeck(
     palette,
     paletteId,
     paletteMapping,
+    palettePreferences,
     masterElements: deck.masterElements.map((element, index) =>
       element.type === "shape"
         ? {
@@ -217,6 +232,7 @@ export function applyThemeToDeck(deck: Deck, theme: Theme): Deck {
     palette: theme.palette,
     paletteId: undefined,
     paletteMapping: DEFAULT_MAPPING,
+    palettePreferences: theme.palettePreferences || DEFAULT_PALETTE_PREFERENCES,
     masterElements: structuredClone(theme.masterElements),
     slides,
   };

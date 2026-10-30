@@ -53,7 +53,7 @@ FRAME is a browser-based slide editor. Preserve JSON import/export compatibility
 
 ## パレット同期のやり方
 
-Run `npm run sync-palettes` while online, then review the diff and run `npm run build`. The script reads the JSON array following `window.ATLAS_PALETTES =`, validates it, and atomically writes `src/data/miranova-palettes.json`; a failed fetch leaves the prior file untouched. The app never fetches palettes at runtime.
+Run `npm run sync-palettes` while online, confirm the reported count (235 as of 2026-10-31), review the diff, then run `npm run check:schema` and `npm run build`. The script reads the JSON array following `window.ATLAS_PALETTES =`, requires only `id`, `name`, `base`, `sub`, and `accent`, preserves all additional fields such as `purpose` and `selectionBasis`, and atomically writes `src/data/miranova-palettes.json`. A failed fetch leaves the prior file untouched. The app never fetches palettes at runtime.
 
 ## パレットからテーマを作る手順
 
