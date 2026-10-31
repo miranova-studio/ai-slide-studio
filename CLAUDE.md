@@ -23,6 +23,7 @@ FRAME is a browser-based slide editor. Preserve JSON import/export compatibility
 - `src/services/ai/adapter.ts`: future server-side AI integration boundary; currently mock
 - `src/App.tsx`: editor, import/export, and shared slide renderer
 - `src/components/ThemePanel.tsx`: theme and palette editing UI
+- `src/components/ColorChooser.tsx` and `src/colors.ts`: shared native/app color control, HEX validation, and recent-color list
 - `src/styles.css`: workspace UI and print CSS
 
 ## Current UI and data contract
@@ -33,6 +34,7 @@ FRAME is a browser-based slide editor. Preserve JSON import/export compatibility
 - Shapes support `rect`, `roundRect`, `ellipse`, `triangle`, `line`, and `arrow`. Keep the schema enum, TypeScript type, editor picker, renderer, and future PPTX mapping in sync.
 - `src/App.tsx` owns in-memory deck undo/redo snapshots; they are never persisted or exported. Route deck edits through `changeDeck`. Pointer move/resize previews update without creating history entries, then commit one snapshot on release. Native contentEditable/input undo takes precedence over deck shortcuts while typing.
 - Thumbnail and grid ⌘/Ctrl-click add or remove one selected slide; Shift-click selects a range. Background controls patch all selected slide IDs in one deck update; element controls remain scoped to one selected element. Background opacity/color gestures register one undo snapshot on the first actual change, then update the preview within that same gesture. This keeps Undo enabled immediately. "Apply to all" copies the active slide's effective color as an explicit override and can include hidden slides. "Return to theme background" removes overrides in one update; its button is disabled with an explanation when none of the selected slides has an override. `src/backgrounds.ts` holds shared background operations.
+- Background, shape fill, and shape stroke use `ColorChooser`. Keep the native color input and the in-app theme/MIRANOVA/recent swatches plus validated `#RRGGBB` entry. Recent colors live only in guarded LocalStorage. Route color edits through the existing deck update functions so undo and multi-slide background changes remain intact; text color controls are outside this UI.
 - Text editing begins on double-click and commits on blur. Delete/Backspace removes a selected element only outside editable controls. Thumbnail context menu and the right edit panel both toggle slide visibility.
 - `migrateDeck` accepts v6 through v1 and unversioned decks. v6 migration leaves `background.color` unset so the effective background remains the deck palette color. New interchange fields must update the schema, types, migration, docs, and example JSON together.
 - Business UI colors are defined as `--ui-*` variables in `src/styles.css`. Slide colors come from the deck palette and theme files, not workspace UI colors.

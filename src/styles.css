@@ -1396,6 +1396,24 @@ textarea:focus-visible,
 .background-color-field input { width: 54px; height: 30px; cursor: pointer; }
 .background-color-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .background-color-controls .background-color-field { margin: 4px 0; }
+.app-color-field { width: 100%; min-width: 0; }
+.app-color-field-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.app-color-field-top label { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+.app-color-field-top input[type="color"] { width: 54px; height: 30px; padding: 2px; border: 1px solid var(--ui-border); cursor: pointer; }
+.app-color-open { border: 1px solid var(--ui-border); border-radius: 5px; padding: 7px 9px; background: var(--ui-surface); color: var(--ui-primary); font-size: 11px; cursor: pointer; }
+.app-color-picker { margin: 8px 0; padding: 10px; border: 1px solid var(--ui-border); border-radius: 7px; background: var(--ui-surface-muted); }
+.app-color-group { margin-bottom: 10px; }
+.app-color-group strong { display: block; margin-bottom: 5px; font-size: 11px; }
+.app-color-swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.app-color-swatch { width: 28px; height: 28px; padding: 0; border: 2px solid var(--ui-surface); border-radius: 5px; box-shadow: 0 0 0 1px var(--ui-border); cursor: pointer; }
+.app-color-swatch:focus-visible { outline: 2px solid var(--ui-primary); outline-offset: 2px; }
+.app-color-hex { display: flex; align-items: flex-end; gap: 7px; }
+.app-color-hex label { display: grid; gap: 4px; flex: 1; min-width: 0; font-size: 11px; }
+.app-color-hex input { width: 100%; height: 32px; padding: 5px 7px; border: 1px solid var(--ui-border); background: var(--ui-surface); font-family: monospace; }
+.app-color-hex input[aria-invalid="true"] { border-color: var(--ui-danger); }
+.app-color-hex button { height: 32px; border: 1px solid var(--ui-primary); border-radius: 5px; background: var(--ui-primary); color: white; cursor: pointer; }
+.app-color-hex button:disabled { opacity: 0.45; cursor: not-allowed; }
+.app-color-picker p[role="alert"] { margin: 6px 0 0; color: var(--ui-danger); font-size: 10px; }
 .reset-background-button {
   border: 1px solid var(--ui-border);
   border-radius: 5px;
@@ -1598,6 +1616,7 @@ textarea:focus-visible,
   gap: 9px;
   margin-top: 12px;
 }
+.shape-colors .app-color-field { grid-column: 1 / -1; }
 .shape-colors label {
   display: flex;
   flex-direction: column;
@@ -1605,6 +1624,8 @@ textarea:focus-visible,
   font-size: 10px;
   color: var(--ui-muted);
 }
+.shape-colors .app-color-field-top label { flex-direction: row; align-items: center; }
+.shape-colors .app-color-hex label { display: grid; }
 .shape-colors input {
   width: 100%;
   height: 32px;
@@ -1613,6 +1634,8 @@ textarea:focus-visible,
   background: white;
   cursor: pointer;
 }
+.shape-colors .app-color-field-top input[type="color"] { width: 54px; }
+.shape-colors .app-color-hex input { cursor: text; }
 .header-actions button:disabled {
   opacity: 0.42;
   cursor: not-allowed;

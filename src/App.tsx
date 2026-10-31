@@ -36,6 +36,9 @@ import {
   deleteAudio,
 } from "./services/storage";
 import { ThemePanel } from "./components/ThemePanel";
+import { ColorChooser } from "./components/ColorChooser";
+import type { ColorChoice } from "./components/ColorChooser";
+import { addRecentColor, parseRecentColors } from "./colors";
 import { CourseOutline } from "./components/CourseOutline";
 import miranovaPalettes from "./data/miranova-palettes.json";
 import {
@@ -91,6 +94,7 @@ const shapeLabels: { value: ShapeElement["shape"]; label: string }[] = [
   { value: "line", label: "線" },
   { value: "arrow", label: "矢印" },
 ];
+const RECENT_COLORS_KEY = "ai-slide-studio.recent-colors";
 const round2 = (value: number) => Number(value.toFixed(2));
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -410,6 +414,10 @@ export default function App() {
   const [noteText, setNoteText] = useState("");
   const [toast, setToast] = useState("");
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [recentColors, setRecentColors] = useState<string[]>(() => {
+    try { return parseRecentColors(window.localStorage.getItem(RECENT_COLORS_KEY)); }
+    catch { return []; }
+  });
   const imageFileRef = useRef<HTMLInputElement>(null);
   const backgroundFileRef = useRef<HTMLInputElement>(null);
   const jsonFileRef = useRef<HTMLInputElement>(null);
@@ -439,6 +447,27 @@ export default function App() {
   const themes = [...builtInThemes, ...customThemes];
   const activeTheme =
     themes.find((item) => item.id === deck.themeId) || builtInThemes[0];
+  const themeColors: ColorChoice[] = [
+    { label: "背景", color: activeTheme.palette.background },
+    { label: "メイン", color: activeTheme.palette.main },
+    { label: "アクセント", color: activeTheme.palette.accent },
+    { label: "文字", color: activeTheme.palette.text },
+  ];
+  const selectedMiranovaPalette = (miranovaPalettes as MiranovaPalette[]).find((item) => item.id === deck.paletteId);
+  const miranovaColors: ColorChoice[] = selectedMiranovaPalette ? [
+    { label: "Base", color: selectedMiranovaPalette.base },
+    { label: "Sub", color: selectedMiranovaPalette.sub },
+    { label: "Accent", color: selectedMiranovaPalette.accent },
+  ] : [];
+
+  useEffect(() => {
+    try { window.localStorage.setItem(RECENT_COLORS_KEY, JSON.stringify(recentColors)); }
+    catch { /* Storage may be unavailable in a private window. */ }
+  }, [recentColors]);
+
+  function rememberColor(color: string) {
+    setRecentColors((colors) => addRecentColor(colors, color));
+  }
 
   useLayoutEffect(() => {
     if (viewMode !== "scroll") return;
@@ -2232,9 +2261,17 @@ export default function App() {
                   <h4>背景設定 · {backgroundTargetIds.length}枚</h4>
                   {backgroundTargetIds.length > 1 && <p className="panel-help">表示中のスライドの値を表示しています。変更すると選択中の全スライドに反映します。</p>}
                   <div className="background-color-controls">
-                    <label className="background-color-field">背景色
-                      <input type="color" aria-label="背景色" value={backgroundColor(deck, activeSlide)} onFocus={beginBackgroundGesture} onBlur={endBackgroundGesture} onChange={(event) => updateBackground({ color: event.target.value.toUpperCase() })} />
-                    </label>
+                    <ColorChooser
+                      label="背景色"
+                      value={backgroundColor(deck, activeSlide)}
+                      themeColors={themeColors}
+                      miranovaColors={miranovaColors}
+                      recentColors={recentColors}
+                      onColorChange={(color) => updateBackground({ color })}
+                      onRememberColor={rememberColor}
+                      onNativeBegin={beginBackgroundGesture}
+                      onNativeEnd={endBackgroundGesture}
+                    />
                     <button className="reset-background-button" onClick={resetBackgroundColor} disabled={customBackgroundCount === 0}>テーマの背景色に戻す</button>
                   </div>
                   <p className="background-color-status" aria-live="polite">
@@ -2370,57 +2407,24 @@ export default function App() {
                       <div className="shape-colors">
                         <OpacityControl label="塗りの透明度" value={selected.style.fillOpacity ?? selected.style.opacity ?? 1} onChange={(value) => updateElement(selected.id, { style: { ...selected.style, fillOpacity: value } } as Partial<ShapeElement>)} />
                         <OpacityControl label="枠線の透明度" value={selected.style.strokeOpacity ?? selected.style.opacity ?? 1} onChange={(value) => updateElement(selected.id, { style: { ...selected.style, strokeOpacity: value } } as Partial<ShapeElement>)} />
-                        <label>
-                          塗り色
-                          <input
-                            type="color"
-                            value={
-                              /^#[0-9a-fA-F]{6}$/.test(selected.style.fill)
-                                ? selected.style.fill
-                                : "#2454e8"
-                            }
-                            onInput={(event) =>
-                              updateShapeColor(
-                                selected.id,
-                                "fill",
-                                event.currentTarget.value,
-                              )
-                            }
-                            onChange={(event) =>
-                              updateShapeColor(
-                                selected.id,
-                                "fill",
-                                event.currentTarget.value,
-                              )
-                            }
-                          />
-                        </label>
-                        <label>
-                          枠線色
-                          <input
-                            type="color"
-                            value={
-                              selected.style.stroke &&
-                              /^#[0-9a-fA-F]{6}$/.test(selected.style.stroke)
-                                ? selected.style.stroke
-                                : "#163794"
-                            }
-                            onInput={(event) =>
-                              updateShapeColor(
-                                selected.id,
-                                "stroke",
-                                event.currentTarget.value,
-                              )
-                            }
-                            onChange={(event) =>
-                              updateShapeColor(
-                                selected.id,
-                                "stroke",
-                                event.currentTarget.value,
-                              )
-                            }
-                          />
-                        </label>
+                        <ColorChooser
+                          label="塗り色"
+                          value={selected.style.fill}
+                          themeColors={themeColors}
+                          miranovaColors={miranovaColors}
+                          recentColors={recentColors}
+                          onColorChange={(color) => updateShapeColor(selected.id, "fill", color)}
+                          onRememberColor={rememberColor}
+                        />
+                        <ColorChooser
+                          label="枠線色"
+                          value={selected.style.stroke || selected.style.fill}
+                          themeColors={themeColors}
+                          miranovaColors={miranovaColors}
+                          recentColors={recentColors}
+                          onColorChange={(color) => updateShapeColor(selected.id, "stroke", color)}
+                          onRememberColor={rememberColor}
+                        />
                         <label className="stroke-width-field">
                           枠線の太さ (0–20)
                           <span>
