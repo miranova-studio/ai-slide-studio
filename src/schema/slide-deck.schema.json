@@ -19,7 +19,7 @@
     "updatedAt"
   ],
   "properties": {
-    "schemaVersion": { "const": 6 },
+    "schemaVersion": { "const": 7 },
     "mode": { "enum": ["deck", "course"] },
     "id": { "type": "string", "minLength": 1 },
     "title": { "type": "string" },
@@ -159,6 +159,7 @@
           "additionalProperties": false,
           "required": ["colorOpacity", "imageOpacity"],
           "properties": {
+            "color": { "$ref": "#/$defs/color" },
             "colorOpacity": { "type": "number", "minimum": 0, "maximum": 1 },
             "imageOpacity": { "type": "number", "minimum": 0, "maximum": 1 },
             "imageSrc": { "type": "string", "pattern": "^data:image/(png|jpeg|webp);base64," }

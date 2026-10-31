@@ -9,7 +9,7 @@ The source-controlled theme files live in [`themes/`](../themes/). Each file is 
 | `themeVersion`           | Required, currently `1`. This is separate from slide `schemaVersion`.                      |
 | `id`, `name`, `category` | Stable file key, display name, category.                                                   |
 | `palette`                | HEX colors `background`, `main`, `accent`, `text`.                                         |
-| `background`             | Optional slide background defaults: `colorOpacity`, `imageOpacity` (0–1), optional image data URL `imageSrc`. |
+| `background`             | Optional slide background defaults: `colorOpacity`, `imageOpacity` (0–1), optional HEX `color` and image data URL `imageSrc`. A theme's `background.color` becomes the deck's default background color when applied; existing per-slide `background.color` overrides remain pinned across theme switches. |
 | `fonts`                  | CSS font stacks for `heading` and `body`. Include Japanese fallbacks.                      |
 | `masterElements`         | Shared decorative shape/image elements in slide coordinates.                               |
 | `layouts`                | `title`, `body`, and `image` variants. Each has `eyebrow`, `title`, `body`, `image` boxes. |

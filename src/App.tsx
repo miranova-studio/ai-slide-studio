@@ -24,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { defaultDeck, makeSlide, makeText } from "./data/defaultDeck";
+import { applyBackgroundToAll, backgroundColor, resetBackgroundColors, updateBackgrounds } from "./backgrounds";
 import { assertDeck, migrateDeck } from "./schema/validate";
 import {
   loadDeck,
@@ -134,15 +135,15 @@ function elementBox(element: SlideElement): React.CSSProperties {
   };
 }
 
-function OpacityControl({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
+function OpacityControl({ label, value, onChange, onBegin, onEnd }: { label: string; value: number; onChange: (value: number) => void; onBegin?: () => void; onEnd?: () => void }) {
   const percent = Math.round(value * 100);
   const update = (raw: string) => {
     const number = Number(raw);
     if (Number.isFinite(number)) onChange(clamp(number, 0, 100) / 100);
   };
   return <label className="opacity-field">{label}（0〜100%）<span>
-    <input type="range" min="0" max="100" value={percent} onChange={(event) => update(event.target.value)} />
-    <input type="number" min="0" max="100" value={percent} onChange={(event) => update(event.target.value)} />
+    <input type="range" min="0" max="100" value={percent} onPointerDown={onBegin} onPointerUp={onEnd} onPointerCancel={onEnd} onKeyDown={onBegin} onKeyUp={onEnd} onBlur={onEnd} onChange={(event) => update(event.target.value)} />
+    <input type="number" min="0" max="100" value={percent} onFocus={onBegin} onBlur={onEnd} onChange={(event) => update(event.target.value)} />
   </span></label>;
 }
 function colorWithOpacity(color: string, opacity: number) {
@@ -195,7 +196,7 @@ function SlideCanvas({
       className={`slide-canvas template-${template}`}
       style={{ background: "#FFFFFF", color: palette.text }}
     >
-      <div className="slide-background-color" style={{ backgroundColor: palette.background, opacity: slide.background?.colorOpacity ?? 1 }} />
+      <div className="slide-background-color" style={{ backgroundColor: slide.background?.color ?? palette.background, opacity: slide.background?.colorOpacity ?? 1 }} />
       {slide.background?.imageSrc && <img className="slide-background-image" src={slide.background.imageSrc} alt="" style={{ opacity: slide.background.imageOpacity ?? 1 }} />}
       {[
         ...(slide.showMaster || masterMode
@@ -378,6 +379,11 @@ export default function App() {
   const gestureRef = useRef<Gesture | null>(null);
   const [ready, setReady] = useState(false);
   const [activeId, setActiveId] = useState(defaultDeck.slides[0].id);
+  const [selectedSlideIds, setSelectedSlideIds] = useState<string[]>([defaultDeck.slides[0].id]);
+  const selectionAnchorId = useRef(defaultDeck.slides[0].id);
+  const backgroundGestureRef = useRef<Deck | null>(null);
+  const [applyAllOpen, setApplyAllOpen] = useState(false);
+  const [includeHidden, setIncludeHidden] = useState(false);
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [editingTextId, setEditingTextId] = useState<string | undefined>();
   const [shapeKind, setShapeKind] = useState<ShapeElement["shape"]>("rect");
@@ -413,6 +419,9 @@ export default function App() {
     deck.slides.findIndex((slide) => slide.id === activeId),
   );
   const activeSlide = deck.slides[activeIndex];
+  const validSelectedSlideIds = selectedSlideIds.filter((id) => deck.slides.some((slide) => slide.id === id));
+  const backgroundTargetIds = validSelectedSlideIds.length ? validSelectedSlideIds : [activeId];
+  const applyAllCount = deck.slides.filter((slide) => includeHidden || !slide.hidden).length;
   const orderedSlides = courseSlides(deck);
   const activePosition = Math.max(
     0,
@@ -435,6 +444,8 @@ export default function App() {
         deckRef.current = loaded;
         setDeck(loaded);
         setActiveId(loaded.slides[0].id);
+        setSelectedSlideIds([loaded.slides[0].id]);
+        selectionAnchorId.current = loaded.slides[0].id;
       })
       .catch((error) =>
         notify(
@@ -503,10 +514,10 @@ export default function App() {
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
-      const typing = !!target?.closest(
-        'input, textarea, [contenteditable="true"]',
-      );
-      if (typing || presenting || scriptOpen) return;
+      const input = target?.closest("input");
+      const typing = !!target?.closest('textarea, [contenteditable="true"]') ||
+        !!(input && !["range", "color", "checkbox", "radio", "file", "button"].includes(input.type));
+      if (typing || presenting || scriptOpen || applyAllOpen) return;
       const shortcut = event.metaKey || event.ctrlKey;
       if (shortcut && event.key.toLowerCase() === "z") {
         event.preventDefault();
@@ -706,16 +717,20 @@ export default function App() {
   }
   function restoreDeck(next: Deck) {
     showDeck(next);
-    setActiveId((current) =>
-      next.slides.some((slide) => slide.id === current)
-        ? current
-        : next.slides[0].id,
-    );
+    const nextActiveId = next.slides.some((slide) => slide.id === activeId) ? activeId : next.slides[0].id;
+    setActiveId(nextActiveId);
+    if (!next.slides.some((slide) => slide.id === selectionAnchorId.current))
+      selectionAnchorId.current = nextActiveId;
+    setSelectedSlideIds((ids) => {
+      const valid = ids.filter((id) => next.slides.some((slide) => slide.id === id));
+      return valid.length ? valid : [nextActiveId];
+    });
     setSelectedId(undefined);
     setEditingTextId(undefined);
     refreshHistory((value) => value + 1);
   }
   function undo() {
+    endBackgroundGesture();
     const history = historyRef.current;
     const previous = history.past.pop();
     if (!previous) return;
@@ -723,6 +738,7 @@ export default function App() {
     restoreDeck(previous);
   }
   function redo() {
+    endBackgroundGesture();
     const history = historyRef.current;
     const next = history.future.pop();
     if (!next) return;
@@ -791,6 +807,8 @@ export default function App() {
       return { ...current, slides, course };
     });
     setActiveId(next.id);
+    setSelectedSlideIds([next.id]);
+    selectionAnchorId.current = next.id;
     setSelectedId(undefined);
   }
   function deleteSlide(id: string) {
@@ -819,8 +837,13 @@ export default function App() {
         : undefined,
     }));
     if (id === activeId) {
-      setActiveId(slides[Math.min(index, slides.length - 1)].id);
+      const nextId = slides[Math.min(index, slides.length - 1)].id;
+      setActiveId(nextId);
+      setSelectedSlideIds([nextId]);
+      selectionAnchorId.current = nextId;
       setSelectedId(undefined);
+    } else {
+      setSelectedSlideIds((ids) => ids.filter((item) => item !== id));
     }
   }
   function reorder(targetId: string, sourceId = draggedId) {
@@ -877,7 +900,35 @@ export default function App() {
     setThumbnailMenu(null);
   }
   function selectSlide(id: string) {
+    endBackgroundGesture();
     setActiveId(id);
+    setSelectedSlideIds([id]);
+    selectionAnchorId.current = id;
+    setCourseInfoOpen(false);
+    setViewMode("slide");
+    setSelectedId(undefined);
+    setEditingTextId(undefined);
+  }
+  function selectThumbnail(event: React.MouseEvent<HTMLButtonElement>, id: string) {
+    endBackgroundGesture();
+    const ordered = deck.slides.map((slide) => slide.id);
+    if (event.shiftKey) {
+      const anchorIndex = ordered.indexOf(selectionAnchorId.current);
+      const targetIndex = ordered.indexOf(id);
+      const start = Math.min(anchorIndex < 0 ? targetIndex : anchorIndex, targetIndex);
+      const end = Math.max(anchorIndex < 0 ? targetIndex : anchorIndex, targetIndex);
+      setSelectedSlideIds(ordered.slice(start, end + 1));
+      setActiveId(id);
+    } else if (event.metaKey || event.ctrlKey) {
+      const next = selectedSlideIds.includes(id)
+        ? selectedSlideIds.length > 1 ? selectedSlideIds.filter((item) => item !== id) : selectedSlideIds
+        : [...selectedSlideIds, id];
+      setSelectedSlideIds(next);
+      setActiveId(next.includes(id) ? id : next[next.length - 1]);
+      selectionAnchorId.current = id;
+    } else {
+      selectSlide(id);
+    }
     setCourseInfoOpen(false);
     setViewMode("slide");
     setSelectedId(undefined);
@@ -959,6 +1010,8 @@ export default function App() {
       historyRef.current = { past: [], future: [] };
       refreshHistory((value) => value + 1);
       setActiveId(imported.slides[0].id);
+      setSelectedSlideIds([imported.slides[0].id]);
+      selectionAnchorId.current = imported.slides[0].id;
       setSelectedId(undefined);
       setEditingTextId(undefined);
       setCourseInfoOpen(false);
@@ -1305,6 +1358,8 @@ export default function App() {
       };
     });
     setActiveId(slides[0].id);
+    setSelectedSlideIds([slides[0].id]);
+    selectionAnchorId.current = slides[0].id;
     setSelectedId(undefined);
     setScriptOpen(false);
     notify(`${slides.length}枚の下書きを作成しました`);
@@ -1352,13 +1407,39 @@ export default function App() {
     if (imageFileRef.current) imageFileRef.current.value = "";
   }
   function updateBackground(patch: Partial<Slide["background"]>) {
+    if (backgroundGestureRef.current)
+      showDeck(updateBackgrounds(deckRef.current, backgroundTargetIds, patch));
+    else changeDeck((current) => updateBackgrounds(current, backgroundTargetIds, patch));
+  }
+  function beginBackgroundGesture() {
+    if (!backgroundGestureRef.current) backgroundGestureRef.current = deckRef.current;
+  }
+  function endBackgroundGesture() {
+    const before = backgroundGestureRef.current;
+    backgroundGestureRef.current = null;
+    if (before && deckRef.current !== before) {
+      pushHistory(before);
+      showDeck({ ...deckRef.current, updatedAt: new Date().toISOString() });
+    }
+  }
+  function resetBackgroundColor() {
+    changeDeck((current) => resetBackgroundColors(current, backgroundTargetIds));
+  }
+  function removeBackgroundImage() {
+    const ids = new Set(backgroundTargetIds);
     changeDeck((current) => ({
       ...current,
-      slides: current.slides.map((slide) => slide.id === activeId ? {
-        ...slide,
-        background: { ...slide.background, ...patch },
-      } : slide),
+      slides: current.slides.map((slide) => {
+        if (!ids.has(slide.id) || !slide.background.imageSrc) return slide;
+        const { imageSrc: _imageSrc, ...background } = slide.background;
+        return { ...slide, background };
+      }),
     }));
+  }
+  function confirmApplyAllBackground() {
+    changeDeck((current) => applyBackgroundToAll(current, activeId, includeHidden));
+    setApplyAllOpen(false);
+    notify(`${applyAllCount}枚のスライドに背景を適用しました`);
   }
   function uploadBackground(file?: File) {
     if (!file) return;
@@ -1669,6 +1750,7 @@ export default function App() {
                     <Plus size={17} />
                   </button>
                 </div>
+                {railTab === "thumbnails" && <p className="selection-help">{backgroundTargetIds.length}枚選択中 · ⌘/Ctrlクリックで追加、Shiftクリックで範囲選択</p>}
                 <div
                   className="panel-tabs rail-tabs"
                   role="tablist"
@@ -1716,7 +1798,7 @@ export default function App() {
                   <div className="thumbnails">
                     {deck.slides.map((slide, index) => (
                       <div
-                        className={`thumb-row ${slide.id === activeId ? "active" : ""} ${slide.hidden ? "is-hidden" : ""}`}
+                        className={`thumb-row ${slide.id === activeId ? "active" : ""} ${selectedSlideIds.includes(slide.id) ? "selected" : ""} ${slide.hidden ? "is-hidden" : ""}`}
                         key={slide.id}
                         draggable
                         onContextMenu={(event) => {
@@ -1737,10 +1819,9 @@ export default function App() {
                         </span>
                         <button
                           className="thumb"
-                          onClick={() => {
-                            selectSlide(slide.id);
-                            setViewMode("slide");
-                          }}
+                          aria-label={`${index + 1}枚目のスライドを選択`}
+                          aria-pressed={selectedSlideIds.includes(slide.id)}
+                          onClick={(event) => selectThumbnail(event, slide.id)}
                         >
                           <SlideCanvas
                             slide={slide}
@@ -2120,12 +2201,18 @@ export default function App() {
                   <button onClick={() => setPanelTab("theme")}>
                     テーマ・パレットを選ぶ
                   </button>
-                  <h4>このスライドの背景</h4>
-                  <OpacityControl label="背景色の透明度" value={activeSlide.background?.colorOpacity ?? 1} onChange={(value) => updateBackground({ colorOpacity: value })} />
+                  <h4>背景設定 · {backgroundTargetIds.length}枚</h4>
+                  {backgroundTargetIds.length > 1 && <p className="panel-help">表示中のスライドの値を表示しています。変更すると選択中の全スライドに反映します。</p>}
+                  <label className="background-color-field">背景色
+                    <input type="color" aria-label="背景色" value={backgroundColor(deck, activeSlide)} onFocus={beginBackgroundGesture} onBlur={endBackgroundGesture} onChange={(event) => updateBackground({ color: event.target.value.toUpperCase() })} />
+                  </label>
+                  <button onClick={resetBackgroundColor} disabled={!deck.slides.some((slide) => backgroundTargetIds.includes(slide.id) && slide.background.color)}>テーマの背景色に戻す</button>
+                  <OpacityControl label="背景色の透明度" value={activeSlide.background?.colorOpacity ?? 1} onBegin={beginBackgroundGesture} onEnd={endBackgroundGesture} onChange={(value) => updateBackground({ colorOpacity: value })} />
                   <input ref={backgroundFileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(event) => uploadBackground(event.target.files?.[0])} />
                   <button onClick={() => backgroundFileRef.current?.click()}>{activeSlide.background?.imageSrc ? "背景画像を差し替える" : "背景画像を追加"}</button>
-                  {activeSlide.background?.imageSrc && <button onClick={() => changeDeck((current) => ({ ...current, slides: current.slides.map((slide) => slide.id === activeId ? { ...slide, background: { colorOpacity: slide.background.colorOpacity, imageOpacity: slide.background.imageOpacity } } : slide) }))}>背景画像を削除</button>}
-                  <OpacityControl label="背景画像の透明度" value={activeSlide.background?.imageOpacity ?? 1} onChange={(value) => updateBackground({ imageOpacity: value })} />
+                  {deck.slides.some((slide) => backgroundTargetIds.includes(slide.id) && slide.background.imageSrc) && <button onClick={removeBackgroundImage}>背景画像を削除</button>}
+                  <OpacityControl label="背景画像の透明度" value={activeSlide.background?.imageOpacity ?? 1} onBegin={beginBackgroundGesture} onEnd={endBackgroundGesture} onChange={(value) => updateBackground({ imageOpacity: value })} />
+                  <button className="apply-all-background" onClick={() => { setIncludeHidden(false); setApplyAllOpen(true); }}>すべてのスライドに適用</button>
                 </div>
                 <div className="panel-section">
                   <h3>要素を追加</h3>
@@ -2624,6 +2711,23 @@ export default function App() {
             )}
           </aside>
         </main>
+        {applyAllOpen && (
+          <div className="modal-backdrop" onMouseDown={() => setApplyAllOpen(false)}>
+            <div className="script-modal background-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="background-confirm-title" onMouseDown={(event) => event.stopPropagation()} onKeyDown={(event) => { if (event.key === "Escape") setApplyAllOpen(false); }}>
+              <h2 id="background-confirm-title">背景をすべてのスライドに適用</h2>
+              <p>{applyAllCount}枚のスライドの背景を変更します。</p>
+              <p>適用すると、テーマを切り替えてもこれらのスライドの背景色は変わらなくなります。</p>
+              <label className="include-hidden-option">
+                <input type="checkbox" checked={includeHidden} onChange={(event) => setIncludeHidden(event.target.checked)} />
+                非表示スライドも対象に含める
+              </label>
+              <div className="modal-footer">
+                <button autoFocus onClick={() => setApplyAllOpen(false)}>キャンセル</button>
+                <button className="primary large" disabled={applyAllCount === 0} onClick={confirmApplyAllBackground}>適用する</button>
+              </div>
+            </div>
+          </div>
+        )}
         {scriptOpen && (
           <div
             className="modal-backdrop"

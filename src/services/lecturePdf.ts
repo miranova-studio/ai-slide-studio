@@ -215,7 +215,7 @@ export async function lecturePdf(
       y: 0,
       width: WIDTH,
       height: HEIGHT,
-      color: color(deck.palette.background),
+      color: color(slide.background?.color ?? deck.palette.background),
       opacity: slide.background?.colorOpacity ?? 1,
     });
     if (slide.background?.imageSrc) {

@@ -1,5 +1,5 @@
 import type { ThemePalette, PaletteMapping, PalettePreferences } from "./themes";
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 export const SLIDE_WIDTH = 13.333;
 export const SLIDE_HEIGHT = 7.5;
 export type TemplateId = "paper" | "ink" | "signal";
@@ -46,6 +46,7 @@ export interface ShapeElement extends ElementBase {
 }
 export type SlideElement = TextElement | ImageElement | ShapeElement;
 export interface SlideBackground {
+  color?: string;
   colorOpacity: number;
   imageOpacity: number;
   imageSrc?: string;

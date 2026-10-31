@@ -216,22 +216,25 @@ export function layoutSlide(
   return { ...slide, elements };
 }
 export function applyThemeToDeck(deck: Deck, theme: Theme): Deck {
+  const effectiveTheme = theme.background?.color
+    ? { ...theme, palette: { ...theme.palette, background: theme.background.color } }
+    : theme;
   const slides = deck.slides.map((slide, index) => ({
     ...layoutSlide(
       slide,
-      theme,
+      effectiveTheme,
       slide.elements.some((element) => element.type === "image")
         ? "image"
         : index === 0
           ? "title"
           : "body",
     ),
-    background: theme.background ? { ...slide.background, ...theme.background, imageSrc: slide.background?.imageSrc ?? theme.background.imageSrc } : slide.background,
+    background: theme.background ? { ...slide.background, ...theme.background, color: slide.background.color, imageSrc: slide.background?.imageSrc ?? theme.background.imageSrc } : slide.background,
   }));
   return {
     ...deck,
     themeId: theme.id,
-    palette: theme.palette,
+    palette: effectiveTheme.palette,
     paletteId: undefined,
     paletteMapping: DEFAULT_MAPPING,
     palettePreferences: theme.palettePreferences || DEFAULT_PALETTE_PREFERENCES,

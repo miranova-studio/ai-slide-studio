@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "mode": "deck",
   "id": "japanese-sample",
   "title": "日本語PDF検証",
@@ -61,7 +61,7 @@
       "hidden": false,
       "showMaster": true,
       "narration": "",
-      "background": { "colorOpacity": 1, "imageOpacity": 1 },
+      "background": { "color": "#FFF4E8", "colorOpacity": 1, "imageOpacity": 1 },
       "notes": [],
       "elements": [
         {

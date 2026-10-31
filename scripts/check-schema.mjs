@@ -22,6 +22,10 @@ if (!validate(sample))
   throw new Error(JSON.stringify(validate.errors, null, 2));
 if (!validate(courseSample))
   throw new Error(`Course sample: ${JSON.stringify(validate.errors, null, 2)}`);
+const invalidBackground = structuredClone(sample);
+invalidBackground.slides[0].background.color = "not-a-hex-color";
+if (validate(invalidBackground))
+  throw new Error("Invalid slide background color was accepted");
 for (const slide of sample.slides) {
   for (const element of slide.elements) {
     if (

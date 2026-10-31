@@ -1,4 +1,4 @@
-# Slide JSON schema (v6)
+# Slide JSON schema (v7)
 
 The canonical file is [`src/schema/slide-deck.schema.json`](../src/schema/slide-deck.schema.json). Import and export use the same `Deck` object. Import validates the JSON Schema before displaying or saving it. Every edit is stored in IndexedDB as this object.
 
@@ -12,7 +12,7 @@ For `pptxgenjs`, pass the geometry values directly to `slide.addText`, `slide.ad
 
 | Field            | Meaning                                                                               |
 | ---------------- | ------------------------------------------------------------------------------------- |
-| `schemaVersion`  | Required integer. Current value: `6`.                                                 |
+| `schemaVersion`  | Required integer. Current value: `7`.                                                 |
 | `mode`           | `deck` or `course`; see [course-schema.md](course-schema.md) for course fields.       |
 | `id`, `title`    | Presentation identifier and display name.                                             |
 | `template`       | Legacy template identifier (`paper`, `ink`, or `signal`); retained for compatibility. |
@@ -25,7 +25,7 @@ For `pptxgenjs`, pass the geometry values directly to `slide.addText`, `slide.ad
 | `masterElements` | Shared elements rendered behind each slide's contents.                                |
 | `updatedAt`      | ISO 8601 date-time string.                                                            |
 
-Each slide has `id`, ordered `elements`, `hidden` (boolean), `showMaster` (boolean), `notes` (array), `narration` (string), and `background`. The background has `colorOpacity` and `imageOpacity` as 0–1 numbers, plus optional `imageSrc` as an embedded image data URL. Optional `audio` stores audio metadata; the binary resides in IndexedDB. Hidden slides remain editable and in JSON but are excluded from presentation and PDF output. `showMaster: false` suppresses shared master elements on that slide. Master elements are edited once in master-edit mode and appear on all slides with `showMaster: true`. All elements require `id`, `type`, `x`, `y`, `width`, `height`, and `style`.
+Each slide has `id`, ordered `elements`, `hidden` (boolean), `showMaster` (boolean), `notes` (array), `narration` (string), and `background`. The background has `colorOpacity` and `imageOpacity` as 0–1 numbers, plus optional `imageSrc` as an embedded image data URL. Optional `background.color` is a HEX override for that slide; when omitted, the effective color is `deck.palette.background` and changes with the theme. The "テーマの背景色に戻す" action removes this override. The "すべてのスライドに適用" action writes the current effective color as an override to each included slide. Optional `audio` stores audio metadata; the binary resides in IndexedDB. Hidden slides remain editable and in JSON but are excluded from presentation and PDF output. `showMaster: false` suppresses shared master elements on that slide. Master elements are edited once in master-edit mode and appear on all slides with `showMaster: true`. All elements require `id`, `type`, `x`, `y`, `width`, `height`, and `style`.
 
 Each note has `id`, `kind` (`revision`, `question`, or `memo`), non-empty `text`, `completed` (boolean), and ISO 8601 `createdAt`. Notes are attached to a slide and are never printed.
 
@@ -43,7 +43,7 @@ All opacity values are numbers from 0 (transparent) to 1 (opaque). Shape fill an
 
 ```json
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "mode": "deck",
   "id": "demo-001",
   "title": "日本語スライド",
@@ -86,4 +86,4 @@ All opacity values are numbers from 0 (transparent) to 1 (opaque). Shape fill an
 
 ## Version migration
 
-`src/schema/validate.ts` contains `migrateDeck(input)`, the version-dispatch entry point. v5 documents gain an opaque slide background and element opacity defaults of 1. Earlier versions pass through the same v6 migration. Unknown future versions fail clearly. The old LocalStorage key is read once for migration into IndexedDB; it remains as a backup.
+`src/schema/validate.ts` contains `migrateDeck(input)`, the version-dispatch entry point. v6 documents migrate to v7 without adding `background.color`, preserving the same effective theme color and appearance. v5 documents gain an opaque slide background and element opacity defaults of 1 before the v7 migration. Unknown future versions fail clearly. The old LocalStorage key is read once for migration into IndexedDB; it remains as a backup.

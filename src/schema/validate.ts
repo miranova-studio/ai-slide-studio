@@ -32,13 +32,14 @@ export function migrateDeck(input: unknown): Deck {
     throw new Error("JSONの形式が正しくありません");
   const version = (input as { schemaVersion?: unknown }).schemaVersion;
   if (version === SCHEMA_VERSION) return assertDeck(input);
-  if (version === 5) return assertDeck(migrateV5(input));
-  if (version === 4) return assertDeck(migrateV5(migrateV4(input)));
-  if (version === 3) return assertDeck(migrateV5(migrateV4(migrateV3(input))));
-  if (version === 2) return assertDeck(migrateV5(migrateV4(migrateV3(migrateV2(input)))));
-  if (version === 1) return assertDeck(migrateV5(migrateV4(migrateV3(migrateV1(input)))));
+  if (version === 6) return assertDeck(migrateV6(input));
+  if (version === 5) return assertDeck(migrateV6(migrateV5(input)));
+  if (version === 4) return assertDeck(migrateV6(migrateV5(migrateV4(input))));
+  if (version === 3) return assertDeck(migrateV6(migrateV5(migrateV4(migrateV3(input)))));
+  if (version === 2) return assertDeck(migrateV6(migrateV5(migrateV4(migrateV3(migrateV2(input))))));
+  if (version === 1) return assertDeck(migrateV6(migrateV5(migrateV4(migrateV3(migrateV1(input))))));
   if (version === undefined || version === 0)
-    return assertDeck(migrateV5(migrateLegacy(input as LegacyDeck)));
+    return assertDeck(migrateV6(migrateV5(migrateLegacy(input as LegacyDeck))));
   throw new Error(`未対応のschemaVersion: ${String(version)}`);
 }
 
@@ -122,7 +123,7 @@ function migrateV5(input: unknown): Deck {
   };
   return {
     ...old,
-    schemaVersion: SCHEMA_VERSION,
+    schemaVersion: 6,
     masterElements: old.masterElements.map(opaque),
     slides: old.slides.map((slide) => ({
       ...slide,
@@ -130,6 +131,11 @@ function migrateV5(input: unknown): Deck {
       elements: slide.elements.map(opaque),
     })),
   };
+}
+
+function migrateV6(input: unknown): Deck {
+  const old = input as Deck;
+  return { ...old, schemaVersion: 7 };
 }
 
 function migrateLegacy(legacy: LegacyDeck): Deck {
