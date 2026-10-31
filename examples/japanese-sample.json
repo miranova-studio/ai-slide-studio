@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "mode": "deck",
   "id": "japanese-sample",
   "title": "日本語PDF検証",
@@ -21,6 +21,7 @@
       "hidden": false,
       "showMaster": true,
       "narration": "",
+      "background": { "colorOpacity": 1, "imageOpacity": 1 },
       "notes": [],
       "elements": [
         {
@@ -60,6 +61,7 @@
       "hidden": false,
       "showMaster": true,
       "narration": "",
+      "background": { "colorOpacity": 1, "imageOpacity": 1 },
       "notes": [],
       "elements": [
         {

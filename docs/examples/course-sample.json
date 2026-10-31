@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "mode": "course",
   "id": "sample-course",
   "title": "はじめての伝わるスライド講座",
@@ -71,6 +71,7 @@
       "showMaster": true,
       "notes": [],
       "narration": "この講座では、伝わるスライドの作り方を順番に学びます。",
+      "background": { "colorOpacity": 1, "imageOpacity": 1 },
       "elements": [
         {
           "id": "text-1",
@@ -90,6 +91,7 @@
       "showMaster": true,
       "notes": [],
       "narration": "まず、誰に何を伝えるのかを明確にしましょう。",
+      "background": { "colorOpacity": 1, "imageOpacity": 1 },
       "elements": [
         {
           "id": "text-2",
@@ -109,6 +111,7 @@
       "showMaster": true,
       "notes": [],
       "narration": "主張、理由、具体例の順番で構成を作ります。",
+      "background": { "colorOpacity": 1, "imageOpacity": 1 },
       "elements": [
         {
           "id": "text-3",
@@ -128,6 +131,7 @@
       "showMaster": true,
       "notes": [],
       "narration": "色と余白をそろえて読みやすくします。",
+      "background": { "colorOpacity": 1, "imageOpacity": 1 },
       "elements": [
         {
           "id": "text-4",
@@ -147,6 +151,7 @@
       "showMaster": true,
       "notes": [],
       "narration": "最後に発表モードで全体を確認します。",
+      "background": { "colorOpacity": 1, "imageOpacity": 1 },
       "elements": [
         {
           "id": "text-5",

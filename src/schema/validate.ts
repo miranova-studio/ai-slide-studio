@@ -32,12 +32,13 @@ export function migrateDeck(input: unknown): Deck {
     throw new Error("JSONの形式が正しくありません");
   const version = (input as { schemaVersion?: unknown }).schemaVersion;
   if (version === SCHEMA_VERSION) return assertDeck(input);
-  if (version === 4) return assertDeck(migrateV4(input));
-  if (version === 3) return assertDeck(migrateV4(migrateV3(input)));
-  if (version === 2) return assertDeck(migrateV4(migrateV3(migrateV2(input))));
-  if (version === 1) return assertDeck(migrateV4(migrateV3(migrateV1(input))));
+  if (version === 5) return assertDeck(migrateV5(input));
+  if (version === 4) return assertDeck(migrateV5(migrateV4(input)));
+  if (version === 3) return assertDeck(migrateV5(migrateV4(migrateV3(input))));
+  if (version === 2) return assertDeck(migrateV5(migrateV4(migrateV3(migrateV2(input)))));
+  if (version === 1) return assertDeck(migrateV5(migrateV4(migrateV3(migrateV1(input)))));
   if (version === undefined || version === 0)
-    return assertDeck(migrateLegacy(input as LegacyDeck));
+    return assertDeck(migrateV5(migrateLegacy(input as LegacyDeck)));
   throw new Error(`未対応のschemaVersion: ${String(version)}`);
 }
 
@@ -106,9 +107,28 @@ function migrateV4(input: unknown): Deck {
   const old = input as Deck;
   return {
     ...old,
-    schemaVersion: SCHEMA_VERSION,
+    schemaVersion: 5,
     mode: "deck",
     slides: old.slides.map((slide) => ({ ...slide, narration: "" })),
+  };
+}
+
+function migrateV5(input: unknown): Deck {
+  const old = input as Deck;
+  const opaque = (element: Deck["masterElements"][number]): Deck["masterElements"][number] => {
+    if (element.type === "shape") return { ...element, style: { ...element.style, fillOpacity: element.style.fillOpacity ?? element.style.opacity ?? 1, strokeOpacity: element.style.strokeOpacity ?? element.style.opacity ?? 1 } };
+    if (element.type === "image") return { ...element, style: { ...element.style, opacity: element.style.opacity ?? 1 } };
+    return { ...element, style: { ...element.style, opacity: element.style.opacity ?? 1 } };
+  };
+  return {
+    ...old,
+    schemaVersion: SCHEMA_VERSION,
+    masterElements: old.masterElements.map(opaque),
+    slides: old.slides.map((slide) => ({
+      ...slide,
+      background: slide.background || { colorOpacity: 1, imageOpacity: 1 },
+      elements: slide.elements.map(opaque),
+    })),
   };
 }
 
@@ -136,7 +156,7 @@ function migrateLegacy(legacy: LegacyDeck): Deck {
     return slide;
   });
   return {
-    schemaVersion: SCHEMA_VERSION,
+    schemaVersion: 5,
     mode: "deck",
     id: legacy.id || crypto.randomUUID(),
     title: legacy.title || "Imported deck",

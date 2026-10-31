@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://frame.local/schema/slide-deck.v5.json",
-  "title": "FRAME Slide Deck v5",
+  "$id": "https://frame.local/schema/slide-deck.v6.json",
+  "title": "FRAME Slide Deck v6",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -19,7 +19,7 @@
     "updatedAt"
   ],
   "properties": {
-    "schemaVersion": { "const": 5 },
+    "schemaVersion": { "const": 6 },
     "mode": { "enum": ["deck", "course"] },
     "id": { "type": "string", "minLength": 1 },
     "title": { "type": "string" },
@@ -147,12 +147,23 @@
         "notes",
         "showMaster",
         "narration"
+        ,"background"
       ],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "hidden": { "type": "boolean" },
         "showMaster": { "type": "boolean" },
         "narration": { "type": "string" },
+        "background": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["colorOpacity", "imageOpacity"],
+          "properties": {
+            "colorOpacity": { "type": "number", "minimum": 0, "maximum": 1 },
+            "imageOpacity": { "type": "number", "minimum": 0, "maximum": 1 },
+            "imageSrc": { "type": "string", "pattern": "^data:image/(png|jpeg|webp);base64," }
+          }
+        },
         "audio": {
           "type": "object",
           "additionalProperties": false,
@@ -218,7 +229,8 @@
                 "bold": { "type": "boolean" },
                 "align": { "enum": ["left", "center", "right"] },
                 "verticalAlign": { "enum": ["top", "middle", "bottom"] },
-                "lineHeight": { "type": "number", "exclusiveMinimum": 0 }
+                "lineHeight": { "type": "number", "exclusiveMinimum": 0 },
+                "opacity": { "type": "number", "minimum": 0, "maximum": 1 }
               }
             }
           },
@@ -269,7 +281,9 @@
                   "minimum": 0,
                   "maximum": 20
                 },
-                "opacity": { "type": "number", "minimum": 0, "maximum": 1 }
+                "opacity": { "type": "number", "minimum": 0, "maximum": 1 },
+                "fillOpacity": { "type": "number", "minimum": 0, "maximum": 1 },
+                "strokeOpacity": { "type": "number", "minimum": 0, "maximum": 1 }
               }
             }
           },

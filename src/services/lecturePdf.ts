@@ -91,6 +91,7 @@ async function drawElement(
           size,
           font,
           color: color(element.style.color || deck.palette.text),
+          opacity: element.style.opacity ?? 1,
         });
     });
   } else if (element.type === "image") {
@@ -118,7 +119,8 @@ async function drawElement(
     const fill = color(element.style.fill);
     const stroke = color(element.style.stroke || element.style.fill);
     const borderWidth = element.style.strokeWidth || 0;
-    const opacity = element.style.opacity ?? 1;
+    const opacity = element.style.fillOpacity ?? element.style.opacity ?? 1;
+    const borderOpacity = element.style.strokeOpacity ?? element.style.opacity ?? 1;
     if (element.shape === "ellipse")
       page.drawEllipse({
         x: x + width / 2,
@@ -129,6 +131,7 @@ async function drawElement(
         borderColor: stroke,
         borderWidth,
         opacity,
+        borderOpacity,
       });
     else if (element.shape === "line")
       page.drawLine({
@@ -136,7 +139,7 @@ async function drawElement(
         end: { x: x + width, y: y + height / 2 },
         color: stroke,
         thickness: Math.max(1, borderWidth),
-        opacity,
+        opacity: borderOpacity,
       });
     else if (element.shape === "arrow") {
       page.drawLine({
@@ -144,7 +147,7 @@ async function drawElement(
         end: { x: x + width * 0.78, y: y + height / 2 },
         color: stroke,
         thickness: Math.max(2, borderWidth),
-        opacity,
+        opacity: borderOpacity,
       });
       page.drawSvgPath(
         `M 0 0 L ${width * 0.24} ${height / 2} L 0 ${height} Z`,
@@ -158,6 +161,7 @@ async function drawElement(
         borderColor: stroke,
         borderWidth,
         opacity,
+        borderOpacity,
       });
     else
       page.drawRectangle({
@@ -169,6 +173,7 @@ async function drawElement(
         borderColor: stroke,
         borderWidth,
         opacity,
+        borderOpacity,
       });
   }
 }
@@ -203,8 +208,20 @@ export async function lecturePdf(
       y: 0,
       width: WIDTH,
       height: HEIGHT,
-      color: color(deck.palette.background),
+      color: rgb(1, 1, 1),
     });
+    page.drawRectangle({
+      x: 0,
+      y: 0,
+      width: WIDTH,
+      height: HEIGHT,
+      color: color(deck.palette.background),
+      opacity: slide.background?.colorOpacity ?? 1,
+    });
+    if (slide.background?.imageSrc) {
+      const image = await dataImage(pdf, slide.background.imageSrc);
+      page.drawImage(image, { x: 0, y: 0, width: WIDTH, height: HEIGHT, opacity: slide.background.imageOpacity ?? 1 });
+    }
     for (const element of [
       ...(slide.showMaster ? deck.masterElements : []),
       ...slide.elements,

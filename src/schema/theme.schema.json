@@ -39,6 +39,16 @@
         "textMode": { "enum": ["auto", "white", "black"] }
       }
     },
+    "background": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["colorOpacity", "imageOpacity"],
+      "properties": {
+        "colorOpacity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "imageOpacity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "imageSrc": { "type": "string", "pattern": "^data:image/(png|jpeg|webp);base64," }
+      }
+    },
     "fonts": {
       "type": "object",
       "additionalProperties": false,
@@ -138,7 +148,9 @@
             "fill": { "$ref": "#/$defs/color" },
             "stroke": { "$ref": "#/$defs/color" },
             "strokeWidth": { "type": "number", "minimum": 0, "maximum": 20 },
-            "opacity": { "type": "number", "minimum": 0, "maximum": 1 }
+            "opacity": { "type": "number", "minimum": 0, "maximum": 1 },
+            "fillOpacity": { "type": "number", "minimum": 0, "maximum": 1 },
+            "strokeOpacity": { "type": "number", "minimum": 0, "maximum": 1 }
           }
         }
       }

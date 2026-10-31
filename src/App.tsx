@@ -134,6 +134,23 @@ function elementBox(element: SlideElement): React.CSSProperties {
   };
 }
 
+function OpacityControl({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
+  const percent = Math.round(value * 100);
+  const update = (raw: string) => {
+    const number = Number(raw);
+    if (Number.isFinite(number)) onChange(clamp(number, 0, 100) / 100);
+  };
+  return <label className="opacity-field">{label}（0〜100%）<span>
+    <input type="range" min="0" max="100" value={percent} onChange={(event) => update(event.target.value)} />
+    <input type="number" min="0" max="100" value={percent} onChange={(event) => update(event.target.value)} />
+  </span></label>;
+}
+function colorWithOpacity(color: string, opacity: number) {
+  if (/^#[0-9a-fA-F]{6}$/.test(color))
+    return `${color}${Math.round(opacity * 255).toString(16).padStart(2, "0")}`;
+  return `color-mix(in srgb, ${color} ${Math.round(opacity * 100)}%, transparent)`;
+}
+
 function SlideCanvas({
   slide,
   masterElements = [],
@@ -176,8 +193,10 @@ function SlideCanvas({
   return (
     <div
       className={`slide-canvas template-${template}`}
-      style={{ background: palette.background, color: palette.text }}
+      style={{ background: "#FFFFFF", color: palette.text }}
     >
+      <div className="slide-background-color" style={{ backgroundColor: palette.background, opacity: slide.background?.colorOpacity ?? 1 }} />
+      {slide.background?.imageSrc && <img className="slide-background-image" src={slide.background.imageSrc} alt="" style={{ opacity: slide.background.imageOpacity ?? 1 }} />}
       {[
         ...(slide.showMaster || masterMode
           ? masterElements.map((element) => ({ element, master: true }))
@@ -196,8 +215,6 @@ function SlideCanvas({
             className={`slide-element slide-${element.type}${selected}${editingTextId === element.id ? " text-editing" : ""}`}
             style={{
               ...box,
-              opacity:
-                element.type === "text" ? undefined : element.style.opacity,
               pointerEvents: canEdit ? undefined : "none",
             }}
             onClick={(event) => {
@@ -240,6 +257,7 @@ function SlideCanvas({
                       : element.style.verticalAlign === "bottom"
                         ? "flex-end"
                         : "flex-start",
+                  opacity: element.style.opacity ?? 1,
                 }}
                 onBlur={(event) => {
                   if (editingTextId === element.id) {
@@ -258,6 +276,7 @@ function SlideCanvas({
                 style={{
                   objectFit: element.style.fit || "cover",
                   borderRadius: `${element.style.borderRadius || 0}px`,
+                  opacity: element.style.opacity ?? 1,
                 }}
               />
             ) : element.shape === "triangle" ||
@@ -272,23 +291,27 @@ function SlideCanvas({
                   <polygon
                     points="50,2 98,98 2,98"
                     fill={element.style.fill}
+                    fillOpacity={element.style.fillOpacity ?? element.style.opacity ?? 1}
                     stroke={
                       (element.style.strokeWidth ?? 0) > 0
                         ? element.style.stroke || element.style.fill
                         : "none"
                     }
                     strokeWidth={element.style.strokeWidth ?? 2}
+                    strokeOpacity={element.style.strokeOpacity ?? element.style.opacity ?? 1}
                   />
                 ) : element.shape === "arrow" ? (
                   <polygon
                     points="2,34 65,34 65,8 98,50 65,92 65,66 2,66"
                     fill={element.style.fill}
+                    fillOpacity={element.style.fillOpacity ?? element.style.opacity ?? 1}
                     stroke={
                       (element.style.strokeWidth ?? 0) > 0
                         ? element.style.stroke || element.style.fill
                         : "none"
                     }
                     strokeWidth={element.style.strokeWidth ?? 2}
+                    strokeOpacity={element.style.strokeOpacity ?? element.style.opacity ?? 1}
                   />
                 ) : (
                   <line
@@ -297,6 +320,7 @@ function SlideCanvas({
                     x2="98"
                     y2="50"
                     stroke={element.style.stroke || element.style.fill}
+                    strokeOpacity={element.style.strokeOpacity ?? element.style.opacity ?? 1}
                     strokeWidth={Math.max(
                       0,
                       (element.style.strokeWidth ?? 2) * 2,
@@ -308,10 +332,10 @@ function SlideCanvas({
               <div
                 className="shape-fill"
                 style={{
-                  background: element.style.fill,
+                  background: colorWithOpacity(element.style.fill, element.style.fillOpacity ?? element.style.opacity ?? 1),
                   border:
                     (element.style.strokeWidth ?? 0) > 0
-                      ? `${element.style.strokeWidth}px solid ${element.style.stroke || element.style.fill}`
+                      ? `${element.style.strokeWidth}px solid ${colorWithOpacity(element.style.stroke || element.style.fill, element.style.strokeOpacity ?? element.style.opacity ?? 1)}`
                       : undefined,
                   borderRadius:
                     element.shape === "ellipse"
@@ -380,6 +404,7 @@ export default function App() {
   const [toast, setToast] = useState("");
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const imageFileRef = useRef<HTMLInputElement>(null);
+  const backgroundFileRef = useRef<HTMLInputElement>(null);
   const jsonFileRef = useRef<HTMLInputElement>(null);
   const audioFileRef = useRef<HTMLInputElement>(null);
   const bulkAudioRef = useRef<HTMLInputElement>(null);
@@ -1156,6 +1181,7 @@ export default function App() {
       ...activeTheme,
       palette: deck.palette,
       palettePreferences: deck.palettePreferences,
+      background: activeSlide.background,
       masterElements: deck.masterElements.filter(
         (item): item is Theme["masterElements"][number] =>
           item.type === "shape" || item.type === "image",
@@ -1182,6 +1208,7 @@ export default function App() {
         category: "カスタム",
         palette: deck.palette,
         palettePreferences: deck.palettePreferences,
+        background: activeSlide.background,
         masterElements: deck.masterElements.filter(
           (item): item is Theme["masterElements"][number] =>
             item.type === "shape" || item.type === "image",
@@ -1323,6 +1350,24 @@ export default function App() {
     };
     reader.readAsDataURL(file);
     if (imageFileRef.current) imageFileRef.current.value = "";
+  }
+  function updateBackground(patch: Partial<Slide["background"]>) {
+    changeDeck((current) => ({
+      ...current,
+      slides: current.slides.map((slide) => slide.id === activeId ? {
+        ...slide,
+        background: { ...slide.background, ...patch },
+      } : slide),
+    }));
+  }
+  function uploadBackground(file?: File) {
+    if (!file) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type))
+      return notify("PNG・JPG・WebPを選んでください");
+    const reader = new FileReader();
+    reader.onload = () => updateBackground({ imageSrc: String(reader.result) });
+    reader.readAsDataURL(file);
+    if (backgroundFileRef.current) backgroundFileRef.current.value = "";
   }
   function deleteSelected() {
     if (!selected) return;
@@ -2075,6 +2120,12 @@ export default function App() {
                   <button onClick={() => setPanelTab("theme")}>
                     テーマ・パレットを選ぶ
                   </button>
+                  <h4>このスライドの背景</h4>
+                  <OpacityControl label="背景色の透明度" value={activeSlide.background?.colorOpacity ?? 1} onChange={(value) => updateBackground({ colorOpacity: value })} />
+                  <input ref={backgroundFileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(event) => uploadBackground(event.target.files?.[0])} />
+                  <button onClick={() => backgroundFileRef.current?.click()}>{activeSlide.background?.imageSrc ? "背景画像を差し替える" : "背景画像を追加"}</button>
+                  {activeSlide.background?.imageSrc && <button onClick={() => changeDeck((current) => ({ ...current, slides: current.slides.map((slide) => slide.id === activeId ? { ...slide, background: { colorOpacity: slide.background.colorOpacity, imageOpacity: slide.background.imageOpacity } } : slide) }))}>背景画像を削除</button>}
+                  <OpacityControl label="背景画像の透明度" value={activeSlide.background?.imageOpacity ?? 1} onChange={(value) => updateBackground({ imageOpacity: value })} />
                 </div>
                 <div className="panel-section">
                   <h3>要素を追加</h3>
@@ -2189,8 +2240,12 @@ export default function App() {
                         />
                       </label>
                     )}
+                    {selected.type === "text" && <OpacityControl label="文字の透明度" value={selected.style.opacity ?? 1} onChange={(value) => updateElement(selected.id, { style: { ...selected.style, opacity: value } } as Partial<TextElement>)} />}
+                    {selected.type === "image" && <OpacityControl label="画像の透明度" value={selected.style.opacity ?? 1} onChange={(value) => updateElement(selected.id, { style: { ...selected.style, opacity: value } } as Partial<SlideElement>)} />}
                     {selected.type === "shape" && (
                       <div className="shape-colors">
+                        <OpacityControl label="塗りの透明度" value={selected.style.fillOpacity ?? selected.style.opacity ?? 1} onChange={(value) => updateElement(selected.id, { style: { ...selected.style, fillOpacity: value } } as Partial<ShapeElement>)} />
+                        <OpacityControl label="枠線の透明度" value={selected.style.strokeOpacity ?? selected.style.opacity ?? 1} onChange={(value) => updateElement(selected.id, { style: { ...selected.style, strokeOpacity: value } } as Partial<ShapeElement>)} />
                         <label>
                           塗り色
                           <input

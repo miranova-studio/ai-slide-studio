@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import Ajv2020 from "ajv/dist/2020";
 import themeSchema from "./schema/theme.schema.json";
-import type { Deck, ShapeElement, ImageElement, SlideElement } from "./types";
+import type { Deck, ShapeElement, ImageElement, SlideElement, SlideBackground } from "./types";
 
 export interface ThemePalette {
   background: string;
@@ -32,6 +32,7 @@ export interface Theme {
   category: string;
   palette: ThemePalette;
   palettePreferences?: PalettePreferences;
+  background?: SlideBackground;
   fonts: ThemeFonts;
   masterElements: (ShapeElement | ImageElement)[];
   layouts: { title: ThemeLayout; body: ThemeLayout; image: ThemeLayout };
@@ -215,8 +216,8 @@ export function layoutSlide(
   return { ...slide, elements };
 }
 export function applyThemeToDeck(deck: Deck, theme: Theme): Deck {
-  const slides = deck.slides.map((slide, index) =>
-    layoutSlide(
+  const slides = deck.slides.map((slide, index) => ({
+    ...layoutSlide(
       slide,
       theme,
       slide.elements.some((element) => element.type === "image")
@@ -225,7 +226,8 @@ export function applyThemeToDeck(deck: Deck, theme: Theme): Deck {
           ? "title"
           : "body",
     ),
-  );
+    background: theme.background ? { ...slide.background, ...theme.background, imageSrc: slide.background?.imageSrc ?? theme.background.imageSrc } : slide.background,
+  }));
   return {
     ...deck,
     themeId: theme.id,

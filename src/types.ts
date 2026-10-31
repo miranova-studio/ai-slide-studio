@@ -1,5 +1,5 @@
 import type { ThemePalette, PaletteMapping, PalettePreferences } from "./themes";
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 export const SLIDE_WIDTH = 13.333;
 export const SLIDE_HEIGHT = 7.5;
 export type TemplateId = "paper" | "ink" | "signal";
@@ -23,6 +23,7 @@ export interface TextElement extends ElementBase {
     align?: "left" | "center" | "right";
     verticalAlign?: "top" | "middle" | "bottom";
     lineHeight?: number;
+    opacity?: number;
   };
 }
 export interface ImageElement extends ElementBase {
@@ -39,9 +40,16 @@ export interface ShapeElement extends ElementBase {
     stroke?: string;
     strokeWidth?: number;
     opacity?: number;
+    fillOpacity?: number;
+    strokeOpacity?: number;
   };
 }
 export type SlideElement = TextElement | ImageElement | ShapeElement;
+export interface SlideBackground {
+  colorOpacity: number;
+  imageOpacity: number;
+  imageSrc?: string;
+}
 export type NoteKind = "revision" | "question" | "memo";
 export interface SlideNote {
   id: string;
@@ -57,6 +65,7 @@ export interface Slide {
   notes: SlideNote[];
   showMaster: boolean;
   narration: string;
+  background: SlideBackground;
   audio?: {
     id: string;
     filename: string;
