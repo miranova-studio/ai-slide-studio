@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -381,7 +381,8 @@ export default function App() {
   const [activeId, setActiveId] = useState(defaultDeck.slides[0].id);
   const [selectedSlideIds, setSelectedSlideIds] = useState<string[]>([defaultDeck.slides[0].id]);
   const selectionAnchorId = useRef(defaultDeck.slides[0].id);
-  const backgroundGestureRef = useRef<Deck | null>(null);
+  const backgroundGestureRef = useRef<{ before: Deck; recorded: boolean } | null>(null);
+  const multiSlideViewRef = useRef<HTMLDivElement>(null);
   const [applyAllOpen, setApplyAllOpen] = useState(false);
   const [includeHidden, setIncludeHidden] = useState(false);
   const [selectedId, setSelectedId] = useState<string | undefined>();
@@ -421,6 +422,7 @@ export default function App() {
   const activeSlide = deck.slides[activeIndex];
   const validSelectedSlideIds = selectedSlideIds.filter((id) => deck.slides.some((slide) => slide.id === id));
   const backgroundTargetIds = validSelectedSlideIds.length ? validSelectedSlideIds : [activeId];
+  const customBackgroundCount = deck.slides.filter((slide) => backgroundTargetIds.includes(slide.id) && !!slide.background.color).length;
   const applyAllCount = deck.slides.filter((slide) => includeHidden || !slide.hidden).length;
   const orderedSlides = courseSlides(deck);
   const activePosition = Math.max(
@@ -437,6 +439,16 @@ export default function App() {
   const themes = [...builtInThemes, ...customThemes];
   const activeTheme =
     themes.find((item) => item.id === deck.themeId) || builtInThemes[0];
+
+  useLayoutEffect(() => {
+    if (viewMode !== "scroll") return;
+    const container = multiSlideViewRef.current;
+    const target = Array.from(container?.children || []).find(
+      (child) => (child as HTMLElement).dataset.slideId === activeId,
+    ) as HTMLElement | undefined;
+    if (container && target)
+      container.scrollTop += target.getBoundingClientRect().top - container.getBoundingClientRect().top - 24;
+  }, [viewMode, activeId]);
 
   useEffect(() => {
     loadDeck()
@@ -910,6 +922,10 @@ export default function App() {
     setEditingTextId(undefined);
   }
   function selectThumbnail(event: React.MouseEvent<HTMLButtonElement>, id: string) {
+    selectSlideFromList(event, id, true);
+  }
+  function selectSlideFromList(event: React.MouseEvent<HTMLButtonElement>, id: string, open: boolean) {
+    if (event.detail > 1) return;
     endBackgroundGesture();
     const ordered = deck.slides.map((slide) => slide.id);
     if (event.shiftKey) {
@@ -927,10 +943,12 @@ export default function App() {
       setActiveId(next.includes(id) ? id : next[next.length - 1]);
       selectionAnchorId.current = id;
     } else {
-      selectSlide(id);
+      setSelectedSlideIds([id]);
+      setActiveId(id);
+      selectionAnchorId.current = id;
     }
     setCourseInfoOpen(false);
-    setViewMode("slide");
+    if (open) setViewMode("slide");
     setSelectedId(undefined);
     setEditingTextId(undefined);
   }
@@ -1407,20 +1425,25 @@ export default function App() {
     if (imageFileRef.current) imageFileRef.current.value = "";
   }
   function updateBackground(patch: Partial<Slide["background"]>) {
-    if (backgroundGestureRef.current)
-      showDeck(updateBackgrounds(deckRef.current, backgroundTargetIds, patch));
-    else changeDeck((current) => updateBackgrounds(current, backgroundTargetIds, patch));
+    const gesture = backgroundGestureRef.current;
+    if (!gesture) {
+      changeDeck((current) => updateBackgrounds(current, backgroundTargetIds, patch));
+      return;
+    }
+    const next = updateBackgrounds(deckRef.current, backgroundTargetIds, patch);
+    if (next === deckRef.current) return;
+    if (!gesture.recorded) {
+      pushHistory(gesture.before);
+      gesture.recorded = true;
+    }
+    showDeck({ ...next, updatedAt: new Date().toISOString() });
   }
   function beginBackgroundGesture() {
-    if (!backgroundGestureRef.current) backgroundGestureRef.current = deckRef.current;
+    if (!backgroundGestureRef.current)
+      backgroundGestureRef.current = { before: deckRef.current, recorded: false };
   }
   function endBackgroundGesture() {
-    const before = backgroundGestureRef.current;
     backgroundGestureRef.current = null;
-    if (before && deckRef.current !== before) {
-      pushHistory(before);
-      showDeck({ ...deckRef.current, updatedAt: new Date().toISOString() });
-    }
   }
   function resetBackgroundColor() {
     changeDeck((current) => resetBackgroundColors(current, backgroundTargetIds));
@@ -2066,11 +2089,13 @@ export default function App() {
                 ) : (
                   <div
                     className={`multi-slide-view ${viewMode === "grid" ? "grid-view" : "scroll-view"}`}
+                    ref={multiSlideViewRef}
                   >
                     {orderedSlides.map((slide, index) => (
                       <div
                         key={slide.id}
-                        className={`multi-slide-item ${slide.id === activeId ? "active" : ""} ${slide.hidden ? "is-hidden" : ""}`}
+                        className={`multi-slide-item ${slide.id === activeId ? "active" : ""} ${selectedSlideIds.includes(slide.id) ? "selected" : ""} ${slide.hidden ? "is-hidden" : ""}`}
+                        data-slide-id={slide.id}
                         draggable={viewMode === "grid"}
                         onDragStart={() => setDraggedId(slide.id)}
                         onDragEnd={() => setDraggedId(null)}
@@ -2083,7 +2108,10 @@ export default function App() {
                       >
                         <button
                           className="multi-slide-heading"
-                          onClick={() => selectSlide(slide.id)}
+                          aria-label={`${index + 1}枚目のスライドを選択。ダブルクリックで開く`}
+                          aria-pressed={selectedSlideIds.includes(slide.id)}
+                          onClick={(event) => selectSlideFromList(event, slide.id, false)}
+                          onDoubleClick={() => selectSlide(slide.id)}
                         >
                           <span>
                             {String(index + 1).padStart(2, "0")} ·{" "}
@@ -2093,10 +2121,10 @@ export default function App() {
                         </button>
                         <button
                           className="multi-slide-preview"
-                          onClick={() => {
-                            selectSlide(slide.id);
-                            if (viewMode === "grid") setViewMode("slide");
-                          }}
+                          aria-label={`${index + 1}枚目のスライドを選択。ダブルクリックで開く`}
+                          aria-pressed={selectedSlideIds.includes(slide.id)}
+                          onClick={(event) => selectSlideFromList(event, slide.id, false)}
+                          onDoubleClick={() => selectSlide(slide.id)}
                         >
                           <SlideCanvas
                             slide={slide}
@@ -2203,10 +2231,19 @@ export default function App() {
                   </button>
                   <h4>背景設定 · {backgroundTargetIds.length}枚</h4>
                   {backgroundTargetIds.length > 1 && <p className="panel-help">表示中のスライドの値を表示しています。変更すると選択中の全スライドに反映します。</p>}
-                  <label className="background-color-field">背景色
-                    <input type="color" aria-label="背景色" value={backgroundColor(deck, activeSlide)} onFocus={beginBackgroundGesture} onBlur={endBackgroundGesture} onChange={(event) => updateBackground({ color: event.target.value.toUpperCase() })} />
-                  </label>
-                  <button onClick={resetBackgroundColor} disabled={!deck.slides.some((slide) => backgroundTargetIds.includes(slide.id) && slide.background.color)}>テーマの背景色に戻す</button>
+                  <div className="background-color-controls">
+                    <label className="background-color-field">背景色
+                      <input type="color" aria-label="背景色" value={backgroundColor(deck, activeSlide)} onFocus={beginBackgroundGesture} onBlur={endBackgroundGesture} onChange={(event) => updateBackground({ color: event.target.value.toUpperCase() })} />
+                    </label>
+                    <button className="reset-background-button" onClick={resetBackgroundColor} disabled={customBackgroundCount === 0}>テーマの背景色に戻す</button>
+                  </div>
+                  <p className="background-color-status" aria-live="polite">
+                    {customBackgroundCount === 0
+                      ? "テーマ色を使用中。個別の背景色がないため、戻すボタンは押せません。"
+                      : customBackgroundCount === backgroundTargetIds.length
+                        ? "個別色を使用中。戻すとテーマの背景色に追従します。"
+                        : `個別色を使用中：${customBackgroundCount}枚／テーマ色を使用中：${backgroundTargetIds.length - customBackgroundCount}枚。戻すと選択中の全スライドがテーマ色に追従します。`}
+                  </p>
                   <OpacityControl label="背景色の透明度" value={activeSlide.background?.colorOpacity ?? 1} onBegin={beginBackgroundGesture} onEnd={endBackgroundGesture} onChange={(value) => updateBackground({ colorOpacity: value })} />
                   <input ref={backgroundFileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(event) => uploadBackground(event.target.files?.[0])} />
                   <button onClick={() => backgroundFileRef.current?.click()}>{activeSlide.background?.imageSrc ? "背景画像を差し替える" : "背景画像を追加"}</button>

@@ -481,8 +481,10 @@ main {
 }
 .workspace {
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: var(--ui-bg);
 }
 .workspace-bar {
@@ -1392,6 +1394,19 @@ textarea:focus-visible,
   font-size: 12px;
 }
 .background-color-field input { width: 54px; height: 30px; cursor: pointer; }
+.background-color-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.background-color-controls .background-color-field { margin: 4px 0; }
+.reset-background-button {
+  border: 1px solid var(--ui-border);
+  border-radius: 5px;
+  padding: 7px 9px;
+  background: var(--ui-primary-soft);
+  color: var(--ui-primary);
+  font-size: 11px;
+  cursor: pointer;
+}
+.reset-background-button:disabled { opacity: 0.5; cursor: not-allowed; }
+.background-color-status { margin: 4px 0 8px; font-size: 11px; color: var(--ui-muted); }
 .apply-all-background { margin-top: 10px; font-weight: 700; }
 .background-confirm-modal { width: min(520px, 85vw); }
 .background-confirm-modal h2 { font-size: 24px; }
@@ -1483,6 +1498,8 @@ textarea:focus-visible,
 .multi-slide-item.active {
   border-color: var(--ui-primary);
 }
+.multi-slide-item.selected { border-color: var(--ui-primary); }
+.multi-slide-item.active.selected { box-shadow: 0 8px 25px var(--ui-shadow), inset 0 0 0 2px var(--ui-primary); }
 .grid-view .multi-slide-item {
   cursor: grab;
 }
@@ -1521,6 +1538,7 @@ textarea:focus-visible,
   cursor: pointer;
 }
 .scroll-view .multi-slide-item {
+  flex: 0 0 auto;
   width: min(100%, 920px);
 }
 .scroll-view .multi-slide-preview {
