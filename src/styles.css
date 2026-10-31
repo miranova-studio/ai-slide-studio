@@ -1398,6 +1398,11 @@ textarea:focus-visible,
 .background-color-controls .background-color-field { margin: 4px 0; }
 .app-color-field { width: 100%; min-width: 0; }
 .app-color-field-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.app-color-entry { width: 32px; height: 32px; padding: 0; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 0 1px var(--ui-border); cursor: pointer; }
+.app-color-entry:focus-visible { outline: 2px solid var(--ui-primary); outline-offset: 3px; }
+.app-color-native-control { position: relative; margin-bottom: 10px; }
+.app-color-native-control button { border: 1px solid var(--ui-border); border-radius: 5px; padding: 6px 9px; background: white; cursor: pointer; }
+.app-color-native-control input[type="color"] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .app-color-field-top label { display: flex; align-items: center; gap: 8px; font-size: 11px; }
 .app-color-field-top input[type="color"] { width: 54px; height: 30px; padding: 2px; border: 1px solid var(--ui-border); cursor: pointer; }
 .app-color-open { border: 1px solid var(--ui-border); border-radius: 5px; padding: 7px 9px; background: var(--ui-surface); color: var(--ui-primary); font-size: 11px; cursor: pointer; }

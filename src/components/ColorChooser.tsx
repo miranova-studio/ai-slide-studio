@@ -44,6 +44,7 @@ export function ColorChooser({
 }: Props) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value);
+  const nativeColorRef = useRef<HTMLInputElement>(null);
   const dragging = useRef(false);
   const [eyeDropperAvailable] = useState(() => typeof window !== "undefined" && "EyeDropper" in window);
   const [h, s, v] = hexToHsv(normalizeHexColor(value) || "#000000");
@@ -81,22 +82,31 @@ export function ColorChooser({
   });
   return <div className="app-color-field">
     <div className="app-color-field-top">
-      <label>{label}
+      <span>{label}</span>
+      <button type="button" className="app-color-entry" aria-label={`${label}を選ぶ`} aria-expanded={open} style={{ backgroundColor: normalizeHexColor(value) || "#000000" }} onClick={() => setOpen((current) => !current)} />
+    </div>
+    {open && <div className="app-color-picker">
+      <div className="app-color-native-control">
+        <button type="button" onClick={() => {
+          const input = nativeColorRef.current;
+          if (!input) return;
+          try {
+            if (typeof input.showPicker === "function") input.showPicker();
+            else input.click();
+          } catch { input.click(); }
+        }}>Macのカラーパネル</button>
         <input
+          ref={nativeColorRef}
           type="color"
-          aria-label={label}
+          aria-label={`${label}のブラウザの色選び`}
+          tabIndex={-1}
           value={normalizeHexColor(value) || "#000000"}
           onFocus={onNativeBegin}
           onBlur={onNativeEnd}
           onInput={(event) => onColorChange(event.currentTarget.value.toUpperCase())}
           onChange={(event) => choose(event.currentTarget.value)}
         />
-      </label>
-      <button type="button" className="app-color-open" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-        {open ? "アプリ内の色選びを閉じる" : "アプリ内で色を選ぶ"}
-      </button>
-    </div>
-    {open && <div className="app-color-picker">
+      </div>
       <Swatches title="現在のテーマ" colors={themeColors} onChoose={choose} />
       <Swatches title="MIRANOVAパレット" colors={miranovaColors} onChoose={choose} />
       <Swatches title="最近使った色" colors={recentColors.map((color) => ({ label: color, color }))} onChoose={choose} />
