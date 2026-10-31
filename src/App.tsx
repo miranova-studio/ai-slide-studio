@@ -386,6 +386,7 @@ export default function App() {
   const [selectedSlideIds, setSelectedSlideIds] = useState<string[]>([defaultDeck.slides[0].id]);
   const selectionAnchorId = useRef(defaultDeck.slides[0].id);
   const backgroundGestureRef = useRef<{ before: Deck; recorded: boolean } | null>(null);
+  const shapeColorGestureRef = useRef<{ before: Deck; recorded: boolean } | null>(null);
   const multiSlideViewRef = useRef<HTMLDivElement>(null);
   const [applyAllOpen, setApplyAllOpen] = useState(false);
   const [includeHidden, setIncludeHidden] = useState(false);
@@ -1538,10 +1539,24 @@ export default function App() {
             ?.elements
     )?.find((element) => element.id === id);
     if (current?.type !== "shape" || current.style[key] === value) return;
-    updateElement(id, {
-      style: { ...current.style, [key]: value },
-    } as Partial<ShapeElement>);
+    const gesture = shapeColorGestureRef.current;
+    if (gesture && !gesture.recorded) {
+      pushHistory(gesture.before);
+      gesture.recorded = true;
+    }
+    if (gesture) {
+      const before = deckRef.current;
+      const patch = { style: { ...current.style, [key]: value } };
+      const next = masterMode
+        ? { ...before, masterElements: before.masterElements.map((item) => item.id === id ? { ...item, ...patch } as SlideElement : item) }
+        : { ...before, slides: before.slides.map((slide) => slide.id === activeId ? { ...slide, elements: slide.elements.map((item) => item.id === id ? { ...item, ...patch } as SlideElement : item) } : slide) };
+      showDeck({ ...next, updatedAt: new Date().toISOString() });
+    } else updateElement(id, { style: { ...current.style, [key]: value } } as Partial<ShapeElement>);
   }
+  function beginShapeColorGesture() {
+    if (!shapeColorGestureRef.current) shapeColorGestureRef.current = { before: deckRef.current, recorded: false };
+  }
+  function endShapeColorGesture() { shapeColorGestureRef.current = null; }
 
   function startGesture(
     event: React.PointerEvent<HTMLElement>,
@@ -2415,6 +2430,8 @@ export default function App() {
                           recentColors={recentColors}
                           onColorChange={(color) => updateShapeColor(selected.id, "fill", color)}
                           onRememberColor={rememberColor}
+                          onNativeBegin={beginShapeColorGesture}
+                          onNativeEnd={endShapeColorGesture}
                         />
                         <ColorChooser
                           label="枠線色"
@@ -2424,6 +2441,8 @@ export default function App() {
                           recentColors={recentColors}
                           onColorChange={(color) => updateShapeColor(selected.id, "stroke", color)}
                           onRememberColor={rememberColor}
+                          onNativeBegin={beginShapeColorGesture}
+                          onNativeEnd={endShapeColorGesture}
                         />
                         <label className="stroke-width-field">
                           枠線の太さ (0–20)

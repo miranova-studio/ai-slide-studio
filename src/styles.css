@@ -1414,6 +1414,12 @@ textarea:focus-visible,
 .app-color-hex button { height: 32px; border: 1px solid var(--ui-primary); border-radius: 5px; background: var(--ui-primary); color: white; cursor: pointer; }
 .app-color-hex button:disabled { opacity: 0.45; cursor: not-allowed; }
 .app-color-picker p[role="alert"] { margin: 6px 0 0; color: var(--ui-danger); font-size: 10px; }
+.app-color-detail { display: grid; gap: 10px; margin: 10px 0; }
+.app-color-square { position: relative; height: 150px; cursor: crosshair; touch-action: none; background-image: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent); border: 1px solid var(--ui-border); border-radius: 5px; }
+.app-color-square-marker { position: absolute; width: 12px; height: 12px; border: 2px solid white; box-shadow: 0 0 0 1px #222; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+.app-color-hue { position: relative; height: 18px; cursor: crosshair; touch-action: none; border-radius: 5px; background: linear-gradient(to right, red, yellow, lime, cyan, blue, magenta, red); }
+.app-color-hue-marker { position: absolute; top: -3px; height: 24px; width: 5px; border: 2px solid white; box-shadow: 0 0 0 1px #222; border-radius: 3px; transform: translateX(-50%); pointer-events: none; }
+.app-color-detail > button { justify-self: start; border: 1px solid var(--ui-border); border-radius: 5px; padding: 6px 9px; background: white; cursor: pointer; }
 .reset-background-button {
   border: 1px solid var(--ui-border);
   border-radius: 5px;
