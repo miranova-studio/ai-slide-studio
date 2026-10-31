@@ -1,9 +1,45 @@
 import { useMemo, useState } from "react";
 import paletteData from "../data/miranova-palettes.json";
-import type { MiranovaPalette, PaletteMapping, PalettePreferences, Theme, ThemePalette } from "../themes";
+import type {
+  MiranovaPalette,
+  PaletteMapping,
+  PalettePreferences,
+  Theme,
+  ThemePalette,
+} from "../themes";
 import { contrastRatio, parsePalettePaste } from "../themes";
 
 const palettes = paletteData as MiranovaPalette[];
+const sectionIds = ["theme", "miranova", "import", "file"] as const;
+type SectionId = (typeof sectionIds)[number];
+const sectionStorageKey = "ai-slide-studio.theme-panel-sections";
+type SectionState = Record<SectionId, boolean>;
+
+function loadSections(): SectionState {
+  const defaults: SectionState = {
+    theme: true,
+    miranova: false,
+    import: false,
+    file: false,
+  };
+  try {
+    const stored = window.localStorage.getItem(sectionStorageKey);
+    if (!stored) return defaults;
+    const parsed: unknown = JSON.parse(stored);
+    if (!parsed || typeof parsed !== "object") return defaults;
+    return Object.fromEntries(
+      sectionIds.map((id) => [
+        id,
+        typeof (parsed as Record<string, unknown>)[id] === "boolean"
+          ? (parsed as Record<string, boolean>)[id]
+          : defaults[id],
+      ]),
+    ) as SectionState;
+  } catch {
+    return defaults;
+  }
+}
+
 type Props = {
   themes: Theme[];
   themeId: string;
@@ -12,7 +48,11 @@ type Props = {
   appliedPalette: ThemePalette;
   paletteId?: string;
   onTheme: (theme: Theme) => void;
-  onPalette: (palette: MiranovaPalette, mapping: PaletteMapping, preferences: PalettePreferences) => void;
+  onPalette: (
+    palette: MiranovaPalette,
+    mapping: PaletteMapping,
+    preferences: PalettePreferences,
+  ) => void;
   onImport: (file: File) => void;
   onExport: () => void;
   onSave: (name: string) => void;
@@ -34,6 +74,19 @@ export function ThemePanel({
   onSaveToFolder,
   notify,
 }: Props) {
+  const [openSections, setOpenSections] = useState(loadSections);
+  function toggleSection(id: SectionId, open: boolean) {
+    setOpenSections((previous) => {
+      if (previous[id] === open) return previous;
+      const next = { ...previous, [id]: open };
+      try {
+        window.localStorage.setItem(sectionStorageKey, JSON.stringify(next));
+      } catch {
+        // Private browsing or restricted storage must not block editing.
+      }
+      return next;
+    });
+  }
   const [category, setCategory] = useState("");
   const [tag, setTag] = useState("");
   const [purpose, setPurpose] = useState("");
@@ -61,7 +114,9 @@ export function ThemePanel({
         (item) =>
           (!category || item.category === category) &&
           (!tag || (item.tags || []).includes(tag)) &&
-          (!purpose || (item.purposes || []).includes(purpose) || item.purpose === purpose) &&
+          (!purpose ||
+            (item.purposes || []).includes(purpose) ||
+            item.purpose === purpose) &&
           (!query ||
             `${item.name} ${item.id}`
               .toLowerCase()
@@ -79,7 +134,10 @@ export function ThemePanel({
     const next = { ...mapping, [key]: value };
     if (current) onPalette(current, next, preferences);
   }
-  function setPreference<K extends keyof PalettePreferences>(key: K, value: PalettePreferences[K]) {
+  function setPreference<K extends keyof PalettePreferences>(
+    key: K,
+    value: PalettePreferences[K],
+  ) {
     if (current) onPalette(current, mapping, { ...preferences, [key]: value });
   }
   function importPaste() {
@@ -104,8 +162,15 @@ export function ThemePanel({
   }
   return (
     <div className="theme-panel">
-      <div className="panel-section">
-        <h3>テーマ</h3>
+      <details
+        className="panel-section theme-section"
+        open={openSections.theme}
+        onToggle={(event) => toggleSection("theme", event.currentTarget.open)}
+      >
+        <summary>
+          <span className="theme-section-indicator" aria-hidden="true" />
+          テーマ
+        </summary>
         <p className="panel-help">文字・画像を残してデザインを切り替えます。</p>
         <div className="theme-options">
           {themes.map((theme) => (
@@ -131,9 +196,18 @@ export function ThemePanel({
             </button>
           ))}
         </div>
-      </div>
-      <div className="panel-section">
-        <h3>MIRANOVAパレットから選ぶ</h3>
+      </details>
+      <details
+        className="panel-section theme-section"
+        open={openSections.miranova}
+        onToggle={(event) =>
+          toggleSection("miranova", event.currentTarget.open)
+        }
+      >
+        <summary>
+          <span className="theme-section-indicator" aria-hidden="true" />
+          MIRANOVAパレットから選ぶ
+        </summary>
         <p className="panel-help">
           Base 70 / Sub 25 / Accent 5 を目安に適用します。
         </p>
@@ -201,10 +275,14 @@ export function ThemePanel({
         </div>
         {current && (
           <div className="palette-detail">
-            <strong>{current.name} ({current.id})</strong>
+            <strong>
+              {current.name} ({current.id})
+            </strong>
             {current.description && <p>{current.description}</p>}
             {current.purpose && <p>用途：{current.purpose}</p>}
-            {current.selectionBasis && <p>選定理由：{current.selectionBasis}</p>}
+            {current.selectionBasis && (
+              <p>選定理由：{current.selectionBasis}</p>
+            )}
           </div>
         )}
         <h4>色の割り当て</h4>
@@ -227,25 +305,65 @@ export function ThemePanel({
             </select>
           </label>
         ))}
-        <label className="mapping-row">ベース色
-          <select aria-label="ベース色" value={preferences.baseMode} onChange={(event) => setPreference("baseMode", event.target.value as PalettePreferences["baseMode"])}>
-            <option value="original">元の色</option><option value="white">ホワイト（#FFFFFF）</option><option value="black">ブラック（#000000）</option>
+        <label className="mapping-row">
+          ベース色
+          <select
+            aria-label="ベース色"
+            value={preferences.baseMode}
+            onChange={(event) =>
+              setPreference(
+                "baseMode",
+                event.target.value as PalettePreferences["baseMode"],
+              )
+            }
+          >
+            <option value="original">元の色</option>
+            <option value="white">ホワイト（#FFFFFF）</option>
+            <option value="black">ブラック（#000000）</option>
           </select>
         </label>
-        <label className="mapping-row">文字色
-          <select aria-label="文字色" value={preferences.textMode} onChange={(event) => setPreference("textMode", event.target.value as PalettePreferences["textMode"])}>
-            <option value="auto">自動</option><option value="white">ホワイト</option><option value="black">ブラック</option>
+        <label className="mapping-row">
+          文字色
+          <select
+            aria-label="文字色"
+            value={preferences.textMode}
+            onChange={(event) =>
+              setPreference(
+                "textMode",
+                event.target.value as PalettePreferences["textMode"],
+              )
+            }
+          >
+            <option value="auto">自動</option>
+            <option value="white">ホワイト</option>
+            <option value="black">ブラック</option>
           </select>
         </label>
-        {preferences.textMode !== "auto" && contrastRatio(appliedPalette.background, appliedPalette.text) < 4.5 && (
-          <p className="palette-contrast-warning" role="alert">読みにくい可能性があります（コントラスト比 {contrastRatio(appliedPalette.background, appliedPalette.text).toFixed(2)}:1）</p>
-        )}
+        {preferences.textMode !== "auto" &&
+          contrastRatio(appliedPalette.background, appliedPalette.text) <
+            4.5 && (
+            <p className="palette-contrast-warning" role="alert">
+              読みにくい可能性があります（コントラスト比{" "}
+              {contrastRatio(
+                appliedPalette.background,
+                appliedPalette.text,
+              ).toFixed(2)}
+              :1）
+            </p>
+          )}
         <p className="panel-help">
           自動の文字色は背景とのコントラスト比4.5:1以上になる黒／白を選択します。
         </p>
-      </div>
-      <div className="panel-section">
-        <h3>汎用パレットの取り込み</h3>
+      </details>
+      <details
+        className="panel-section theme-section"
+        open={openSections.import}
+        onToggle={(event) => toggleSection("import", event.currentTarget.open)}
+      >
+        <summary>
+          <span className="theme-section-indicator" aria-hidden="true" />
+          汎用パレットの取り込み
+        </summary>
         <textarea
           aria-label="JSON・CSS変数・HEXを貼り付け"
           value={paste}
@@ -255,9 +373,16 @@ export function ThemePanel({
           }
         />
         <button onClick={importPaste}>3色を適用</button>
-      </div>
-      <div className="panel-section">
-        <h3>テーマファイル</h3>
+      </details>
+      <details
+        className="panel-section theme-section"
+        open={openSections.file}
+        onToggle={(event) => toggleSection("file", event.currentTarget.open)}
+      >
+        <summary>
+          <span className="theme-section-indicator" aria-hidden="true" />
+          テーマファイル
+        </summary>
         <input
           aria-label="新しいテーマ名"
           value={name}
@@ -287,7 +412,7 @@ export function ThemePanel({
           保存したテーマはブラウザ内にも保持します。ソース管理するには themes/
           を選ぶか、書き出したJSONを配置してください。
         </p>
-      </div>
+      </details>
     </div>
   );
 }
