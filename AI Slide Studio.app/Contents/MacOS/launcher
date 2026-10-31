@@ -1,3 +1,27 @@
 #!/bin/bash
 APP_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
-/usr/bin/open "$APP_DIR/AI Slide Studio.command"
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+
+show_error() {
+  /usr/bin/osascript \
+    -e 'on run argv' \
+    -e '«event sysodlog» (item 1 of argv) given «class btns»:{"閉じる"}, «class dflt»:"閉じる", «class appr»:"AI Slide Studio"' \
+    -e 'end run' \
+    "$1"
+}
+
+if ! cd "$APP_DIR"; then
+  show_error 'AI Slide Studio のフォルダを開けませんでした。'
+  exit 1
+fi
+if ! command -v node >/dev/null 2>&1; then
+  show_error 'Node.js が見つかりません。README.md を確認してください。'
+  exit 1
+fi
+
+output="$(node scripts/launch.mjs 2>&1)"
+result=$?
+if [ "$result" -ne 0 ]; then
+  show_error "$(printf '起動できませんでした。\n%s' "$output")"
+fi
+exit "$result"
