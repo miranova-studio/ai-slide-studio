@@ -47,6 +47,15 @@ textarea:focus-visible,
   flex-direction: column;
   background: var(--ui-bg);
 }
+.storage-location-notice {
+  margin: 0;
+  padding: 7px 20px;
+  background: var(--ui-primary-soft);
+  color: var(--ui-text);
+  border-bottom: 1px solid var(--ui-border);
+  font-size: 12px;
+  text-align: center;
+}
 header {
   height: 68px;
   display: grid;

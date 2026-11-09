@@ -1769,6 +1769,7 @@ export default function App() {
             </button>
           </div>
         </header>
+        <p className="storage-location-notice">Web版とPC版の保存データは別々です。データを移すときは、元の版でJSONを書き出し、移動先の版で読み込んでください。</p>
         <main>
           <aside className="slide-rail">
             {deck.mode === "course" && deck.course ? (

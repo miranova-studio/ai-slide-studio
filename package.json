@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:pages": "tsc -b && vite build --base /ai-slide-studio/",
     "preview": "vite preview",
     "typecheck": "tsc -b --pretty false",
     "check:schema": "node scripts/check-schema.mjs",
